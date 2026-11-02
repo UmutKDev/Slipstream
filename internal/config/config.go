@@ -23,17 +23,22 @@ type Config struct {
 	Domains     []string         `json:"domains"`
 	Listen      string           `json:"listen"`
 	SystemProxy bool             `json:"systemProxy"`
+	AutoLearn   bool             `json:"autoLearn"` // çalışmayan sitede sıradaki stratejiyi dene ve hatırla
+	AdBlock     bool             `json:"adBlock"`   // reklam ve izleyici engelleyici
+	AdAllow     []string         `json:"adAllow"`   // reklam engelleyicinin dokunmayacağı alan adları
 }
 
 // Default, ilk açılış ayarlarıdır.
 func Default() Config {
 	p := profile.All[profile.Default]
 	return Config{
-		Profile: p.ID,
-		DNS:     p.DNS,
-		Mode:    domains.ModeAll,
-		Domains: append([]string(nil), domains.DefaultBlocked...),
-		Listen:  "127.0.0.1:8881",
+		Profile:   p.ID,
+		DNS:       p.DNS,
+		Mode:      domains.ModeAll,
+		Domains:   append([]string(nil), domains.DefaultBlocked...),
+		Listen:    "127.0.0.1:8881",
+		AutoLearn: true,
+		AdBlock:   true,
 	}
 }
 
@@ -44,6 +49,15 @@ func DefaultPath() string {
 		dir = "."
 	}
 	return filepath.Join(dir, "Slipstream", "config.json")
+}
+
+// Dir, ayar dosyasının bulunduğu klasördür; öğrenilen stratejiler ve
+// reklam listeleri de burada saklanır.
+func (s *Store) Dir() string {
+	if s.path == "" {
+		return os.TempDir()
+	}
+	return filepath.Dir(s.path)
 }
 
 // Strategy, geçerli stratejiyi döndürür: önce özel, sonra profil.
@@ -104,4 +118,27 @@ func (s *Store) Update(fn func(*Config)) (Config, error) {
 		return s.cfg, err
 	}
 	return s.cfg, os.Rename(tmp, s.path)
+}
+
+// LoadLearned, öğrenilen site stratejilerini okur.
+func LoadLearned(dir string) map[string]desync.Strategy {
+	m := map[string]desync.Strategy{}
+	b, err := os.ReadFile(filepath.Join(dir, "learned.json"))
+	if err == nil {
+		json.Unmarshal(b, &m)
+	}
+	return m
+}
+
+// SaveLearned, öğrenilen site stratejilerini yazar.
+func SaveLearned(dir string, m map[string]desync.Strategy) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	b, _ := json.MarshalIndent(m, "", "  ")
+	tmp := filepath.Join(dir, "learned.json.tmp")
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(dir, "learned.json"))
 }

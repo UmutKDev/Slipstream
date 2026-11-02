@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 )
@@ -72,6 +73,10 @@ func (e *Engine) serveSOCKS(c net.Conn, br *bufio.Reader) {
 	}
 	port := int(binary.BigEndian.Uint16(pb))
 	up, err := e.Dial(context.Background(), host, port)
+	if errors.Is(err, ErrBlocked) {
+		socksReply(c, 2) // kurallarca izin verilmedi
+		return
+	}
 	if err != nil {
 		e.Stats.Failed.Add(1)
 		e.Log.Warnf("%v", err)
@@ -82,7 +87,7 @@ func (e *Engine) serveSOCKS(c net.Conn, br *bufio.Reader) {
 		up.Close()
 		return
 	}
-	e.tunnel(c, br, up, host)
+	e.tunnel(c, br, up, host, port)
 }
 
 func socksReply(c net.Conn, code byte) error {

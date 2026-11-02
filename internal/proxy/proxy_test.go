@@ -191,3 +191,45 @@ func TestListModeSkipsOtherDomains(t *testing.T) {
 		t.Fatal("liste kipi yanlış eşleşti")
 	}
 }
+
+func TestAutoLearnRetriesAndRemembers(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "ok")
+	}))
+	defer srv.Close()
+	dpi := fakeDPI(t, srv.Listener.Addr().String(), banned)
+	_, port, _ := net.SplitHostPort(dpi)
+
+	r, _ := dns.New("cloudflare")
+	r.AddStatic(banned, net.ParseIP("127.0.0.1"))
+	e := NewEngine(desync.Strategy{Name: "yok"}, r, domains.NewMatcher(domains.ModeAll, nil))
+	e.Candidates = []desync.Strategy{{Name: "sni", Split: desync.SplitSNI, DelayMs: 20}}
+	e.ProbeTimeout = time.Second
+	e.SetAutoLearn(true)
+	saved := make(chan map[string]desync.Strategy, 1)
+	e.OnLearn = func(m map[string]desync.Strategy) { saved <- m }
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go e.Serve(ctx, ln)
+
+	code, err := httpsVia(ln.Addr().String(), "https://"+banned+":"+port+"/")
+	if err != nil || code != 200 {
+		t.Fatalf("ilk istek: code=%d err=%v", code, err)
+	}
+	select {
+	case m := <-saved:
+		if m["engelli.example"].Name != "sni" {
+			t.Fatalf("öğrenilen: %+v", m)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("strateji kaydedilmedi")
+	}
+	// İkinci istekte öğrenilen strateji ilk sırada denenmeli.
+	if c := e.chainFor("www.engelli.example"); c[0].Name != "sni" {
+		t.Fatalf("zincir: %v", c[0].Name)
+	}
+	if code, err := httpsVia(ln.Addr().String(), "https://"+banned+":"+port+"/"); err != nil || code != 200 {
+		t.Fatalf("ikinci istek: code=%d err=%v", code, err)
+	}
+}

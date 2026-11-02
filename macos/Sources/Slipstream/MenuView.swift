@@ -16,6 +16,7 @@ struct MenuView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             stats
+            adBlockRow
             profilePicker
             probeSection
             Divider()
@@ -99,6 +100,36 @@ struct MenuView: View {
             }
         }
         .opacity(isOn ? 1 : 0.55)
+    }
+
+    private var adBlockRow: some View {
+        let info = engine.status?.adBlock
+        return HStack(spacing: 8) {
+            Image(systemName: "hand.raised.fill")
+                .foregroundStyle(info?.enabled == true && isOn ? Theme.ok : .secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Reklam engelleyici").font(.callout)
+                Text(adBlockDetail(info)).font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { info?.enabled ?? false },
+                set: { engine.setAdBlock($0) }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .disabled(!isOn)
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func adBlockDetail(_ info: AdBlockInfo?) -> String {
+        guard isOn, let info else { return "Koruma açıkken çalışır" }
+        if !info.enabled { return "Kapalı" }
+        if !info.hasLists { return "Listeler indiriliyor…" }
+        return "\(info.blocked) istek engellendi · \(info.domains.formatted()) alan adı"
     }
 
     private var profilePicker: some View {

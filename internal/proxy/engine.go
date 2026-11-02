@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/UmutKDev/slipstream/internal/adblock"
 	"github.com/UmutKDev/slipstream/internal/desync"
 	"github.com/UmutKDev/slipstream/internal/dns"
 	"github.com/UmutKDev/slipstream/internal/domains"
@@ -29,6 +30,18 @@ type Engine struct {
 	Stats    *logx.Stats
 
 	DialTimeout time.Duration
+	// ProbeTimeout, otomatik öğrenmede sunucunun ilk yanıtı için beklenen süredir.
+	ProbeTimeout time.Duration
+	// Candidates, geçerli strateji çalışmazsa sırayla denenecek stratejilerdir.
+	Candidates []desync.Strategy
+	// Ads, reklam ve izleyici engelleyicisidir; nil olabilir.
+	Ads *adblock.Blocker
+	// OnLearn, bir site için yeni strateji öğrenilince çağrılır (diske yazmak için).
+	OnLearn func(map[string]desync.Strategy)
+
+	autoLearn atomic.Bool
+	learnMu   sync.RWMutex
+	learned   map[string]desync.Strategy
 
 	mu sync.Mutex
 	ln net.Listener
@@ -36,7 +49,9 @@ type Engine struct {
 
 // NewEngine, bir motor kurar.
 func NewEngine(s desync.Strategy, r *dns.Resolver, m *domains.Matcher) *Engine {
-	e := &Engine{Domains: m, Log: logx.NewRing(500), Stats: logx.NewStats(), DialTimeout: 8 * time.Second}
+	e := &Engine{Domains: m, Log: logx.NewRing(500), Stats: logx.NewStats(),
+		DialTimeout: 8 * time.Second, ProbeTimeout: 5 * time.Second,
+		learned: map[string]desync.Strategy{}}
 	e.SetStrategy(s)
 	e.SetResolver(r)
 	return e
@@ -98,8 +113,14 @@ func (e *Engine) handle(c net.Conn) {
 	}
 }
 
+// ErrBlocked, reklam engelleyicinin kestiği bağlantılar için döner.
+var ErrBlocked = errors.New("reklam engelleyici tarafından engellendi")
+
 // Dial, alan adını DoH ile çözer ve ilk yanıt veren adrese bağlanır.
 func (e *Engine) Dial(ctx context.Context, host string, port int) (net.Conn, error) {
+	if e.Ads != nil && e.Ads.Block(host) {
+		return nil, ErrBlocked
+	}
 	ctx, cancel := context.WithTimeout(ctx, e.DialTimeout)
 	defer cancel()
 	ips, err := e.Resolver().Lookup(ctx, host)
@@ -123,3 +144,9 @@ func (e *Engine) Dial(ctx context.Context, host string, port int) (net.Conn, err
 	}
 	return nil, fmt.Errorf("%s:%d bağlanılamadı: %w", host, port, last)
 }
+
+// SetAutoLearn, site başına otomatik öğrenmeyi açar ya da kapatır.
+func (e *Engine) SetAutoLearn(on bool) { e.autoLearn.Store(on) }
+
+// AutoLearn, otomatik öğrenmenin açık olup olmadığını söyler.
+func (e *Engine) AutoLearn() bool { return e.autoLearn.Load() }

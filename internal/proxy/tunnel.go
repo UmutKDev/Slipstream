@@ -3,8 +3,11 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/UmutKDev/slipstream/internal/desync"
@@ -17,23 +20,183 @@ var httpMethods = [][]byte{
 	[]byte("DELETE "), []byte("OPTIONS "), []byte("PATCH "),
 }
 
-// tunnel, istemciden gelen ilk paketi stratejiye göre dönüştürüp yollar,
-// sonra iki yönlü kopyalamaya geçer.
-func (e *Engine) tunnel(client net.Conn, br *bufio.Reader, up net.Conn, host string) {
-	defer up.Close()
-	client.SetReadDeadline(time.Now().Add(15 * time.Second))
-	st := e.Strategy()
+// blockMarkers, ISS uyarı sayfalarında geçen izlerdir. Türkiye'de engelli
+// HTTP siteleri 5651 sayılı kanuna atıfla uyarı sayfasına yönlendirilir.
+var blockMarkers = [][]byte{[]byte("195.175.254."), []byte("5651")}
 
-	head, err := br.Peek(1)
-	if err == nil && len(head) > 0 {
-		if err := e.sendFirst(br, up, host, st); err != nil {
-			e.Stats.Failed.Add(1)
-			e.Log.Warnf("%s: ilk paket gönderilemedi: %v", host, err)
+// maxAttempts, bir bağlantı için denenecek en fazla strateji sayısıdır.
+const maxAttempts = 4
+
+type firstKind int
+
+const (
+	kindRaw firstKind = iota
+	kindTLS
+	kindHTTP
+)
+
+// first, istemcinin ilk paketidir.
+type first struct {
+	kind firstKind
+	data []byte
+	host string
+	// verifiable, sunucunun bu paketten hemen sonra yanıt vermesi
+	// bekleniyorsa true olur. Gövdeli HTTP isteklerinde sunucu gövdeyi
+	// beklediği için doğrulama yapılmaz.
+	verifiable bool
+}
+
+// tunnel, istemcinin ilk paketini stratejiye göre dönüştürüp yollar, sonra
+// iki yönlü kopyalamaya geçer. Otomatik öğrenme açıksa ve sunucu yanıt
+// vermezse, istemci hiçbir şey fark etmeden yeni bir bağlantıyla sıradaki
+// strateji denenir. Çalışan strateji o site için hatırlanır.
+func (e *Engine) tunnel(client net.Conn, br *bufio.Reader, up net.Conn, host string, port int) {
+	client.SetReadDeadline(time.Now().Add(15 * time.Second))
+	fp, err := readFirst(br, host)
+	client.SetReadDeadline(time.Time{})
+	if err != nil {
+		up.Close()
+		return
+	}
+
+	if fp.kind == kindRaw || !e.Domains.Apply(fp.host) {
+		if len(fp.data) > 0 {
+			if _, err := up.Write(fp.data); err != nil {
+				up.Close()
+				return
+			}
+		}
+		e.pipe(client, br, up, nil)
+		return
+	}
+
+	chain := e.chainFor(fp.host)
+	if !e.AutoLearn() || !fp.verifiable {
+		chain = chain[:1]
+	}
+	for i, st := range chain {
+		if i > 0 {
+			up, err = e.Dial(context.Background(), host, port)
+			if err != nil {
+				break
+			}
+		}
+		p := plan(st, fp)
+		if err := desync.Send(up, p, st); err != nil {
+			up.Close()
+			e.Log.Warnf("%s: gönderilemedi (%s): %v", fp.host, st.Name, err)
+			continue
+		}
+		e.Stats.Bypassed.Add(1)
+		if len(chain) == 1 {
+			e.Log.Infof("%s %s → %s", kindName(fp.kind), fp.host, st.Name)
+			e.pipe(client, br, up, nil)
 			return
 		}
+		resp, err := awaitResponse(up, e.ProbeTimeout)
+		if err == nil {
+			if i > 0 || !e.isLearned(fp.host, st) {
+				e.learn(fp.host, st)
+			}
+			if i > 0 {
+				e.Log.Infof("%s %s → %s (%d. denemede çalıştı, kaydedildi)", kindName(fp.kind), fp.host, st.Name, i+1)
+			} else {
+				e.Log.Infof("%s %s → %s", kindName(fp.kind), fp.host, st.Name)
+			}
+			e.pipe(client, br, up, resp)
+			return
+		}
+		up.Close()
+		e.Log.Warnf("%s: %s stratejisi çalışmadı (%v)", fp.host, st.Name, err)
 	}
-	client.SetReadDeadline(time.Time{})
+	e.Stats.Failed.Add(1)
+	e.forget(fp.host)
+	e.Log.Errorf("%s: hiçbir strateji çalışmadı", fp.host)
+}
 
+func kindName(k firstKind) string {
+	if k == kindHTTP {
+		return "HTTP"
+	}
+	return "TLS"
+}
+
+func plan(st desync.Strategy, fp first) desync.Plan {
+	if fp.kind == kindHTTP {
+		return st.PlanHTTP(fp.data)
+	}
+	return st.PlanTLS(fp.data)
+}
+
+// readFirst, istemcinin ilk paketini türüyle birlikte okur.
+func readFirst(br *bufio.Reader, host string) (first, error) {
+	b, err := br.Peek(1)
+	if err != nil || len(b) == 0 {
+		return first{kind: kindRaw}, nil
+	}
+	if b3, _ := br.Peek(3); tlsx.IsTLSHandshake(b3) {
+		rec, err := tlsx.ReadRecord(br)
+		if errors.Is(err, tlsx.ErrNotClientHello) {
+			return first{kind: kindRaw, data: rec}, nil
+		}
+		if err != nil {
+			return first{}, err
+		}
+		fp := first{kind: kindTLS, data: rec, host: host, verifiable: true}
+		if info, err := tlsx.ParseSNI(rec); err == nil {
+			fp.host = info.Host
+		}
+		return fp, nil
+	}
+	if isHTTP(br) {
+		req := readHTTPHead(br)
+		fp := first{kind: kindHTTP, data: req, host: host}
+		head := strings.ToLower(string(req))
+		hasBody := strings.Contains(head, "\r\ncontent-length:") && !strings.Contains(head, "\r\ncontent-length: 0\r\n") ||
+			strings.Contains(head, "\r\ntransfer-encoding:")
+		fp.verifiable = !hasBody
+		return fp, nil
+	}
+	return first{kind: kindRaw}, nil
+}
+
+// awaitResponse, sunucunun ilk yanıtını bekler. Bağlantı sıfırlanırsa, kapanırsa,
+// süre dolarsa ya da yanıt bir ISS uyarı sayfasıysa hata döner.
+func awaitResponse(up net.Conn, timeout time.Duration) ([]byte, error) {
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	up.SetReadDeadline(time.Now().Add(timeout))
+	defer up.SetReadDeadline(time.Time{})
+	buf := make([]byte, 16<<10)
+	n, err := up.Read(buf)
+	if n == 0 {
+		if err == nil || err == io.EOF {
+			err = errors.New("sunucu yanıt vermeden kapattı")
+		}
+		return nil, err
+	}
+	resp := buf[:n]
+	if bytes.HasPrefix(resp, []byte("HTTP/")) {
+		for _, m := range blockMarkers {
+			if bytes.Contains(resp, m) {
+				return nil, errors.New("ISS uyarı sayfası döndü")
+			}
+		}
+	}
+	return resp, nil
+}
+
+// pipe, iki yönlü kopyalamayı yürütür. pending, istemciye önce yazılacak
+// sunucu verisidir.
+func (e *Engine) pipe(client net.Conn, br *bufio.Reader, up net.Conn, pending []byte) {
+	defer up.Close()
+	if len(pending) > 0 {
+		if _, err := client.Write(pending); err != nil {
+			return
+		}
+		e.Stats.BytesDn.Add(int64(len(pending)))
+	}
 	done := make(chan struct{}, 2)
 	go func() {
 		n, _ := io.Copy(up, br)
@@ -59,43 +222,6 @@ func (e *Engine) tunnel(client net.Conn, br *bufio.Reader, up net.Conn, host str
 	case <-t.C:
 	}
 	t.Stop()
-}
-
-func (e *Engine) sendFirst(br *bufio.Reader, up net.Conn, host string, st desync.Strategy) error {
-	b, _ := br.Peek(3)
-	switch {
-	case tlsx.IsTLSHandshake(b):
-		rec, err := tlsx.ReadRecord(br)
-		if err != nil && err != tlsx.ErrNotClientHello {
-			return err
-		}
-		if err == tlsx.ErrNotClientHello {
-			_, err := up.Write(rec)
-			return err
-		}
-		p := st.PlanTLS(rec)
-		if p.Host != "" {
-			host = p.Host
-		}
-		if !e.Domains.Apply(host) {
-			_, err := up.Write(rec)
-			return err
-		}
-		e.Stats.Bypassed.Add(1)
-		e.Log.Infof("TLS %s → %s (%d parça)", host, st.Name, len(p.Cuts)+1)
-		return desync.Send(up, p, st)
-	case isHTTP(br):
-		req := readHTTPHead(br)
-		if !e.Domains.Apply(host) {
-			_, err := up.Write(req)
-			return err
-		}
-		p := st.PlanHTTP(req)
-		e.Stats.Bypassed.Add(1)
-		e.Log.Infof("HTTP %s → %s", host, st.Name)
-		return desync.Send(up, p, st)
-	}
-	return nil
 }
 
 func isHTTP(br *bufio.Reader) bool {

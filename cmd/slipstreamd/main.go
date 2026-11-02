@@ -14,13 +14,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/UmutKDev/slipstream/internal/adblock"
 	"github.com/UmutKDev/slipstream/internal/config"
 	"github.com/UmutKDev/slipstream/internal/control"
+	"github.com/UmutKDev/slipstream/internal/desync"
 	"github.com/UmutKDev/slipstream/internal/dns"
 	"github.com/UmutKDev/slipstream/internal/domains"
 	"github.com/UmutKDev/slipstream/internal/probe"
@@ -105,6 +108,31 @@ func run(args []string) error {
 		return err
 	}
 	eng := proxy.NewEngine(cfg.Strategy(), res, domains.NewMatcher(cfg.Mode, cfg.Domains))
+	eng.Candidates = profile.Candidates()
+	eng.SetAutoLearn(cfg.AutoLearn)
+	dataDir := store.Dir()
+	eng.SetLearned(config.LoadLearned(dataDir))
+	eng.OnLearn = func(m map[string]desync.Strategy) {
+		if err := config.SaveLearned(dataDir, m); err != nil {
+			eng.Log.Warnf("öğrenilen ayarlar yazılamadı: %v", err)
+		}
+	}
+
+	ads := adblock.New(filepath.Join(dataDir, "adblock"))
+	ads.SetAllow(cfg.AdAllow)
+	ads.SetEnabled(cfg.AdBlock)
+	// Listeler de engelli olabilir; motorun DoH çözücüsüyle indirilir.
+	ads.Client = &http.Client{Timeout: time.Minute, Transport: &http.Transport{
+		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+			h, p, _ := net.SplitHostPort(addr)
+			n, _ := strconv.Atoi(p)
+			return eng.Dial(ctx, h, n)
+		},
+	}}
+	if ok, _ := ads.LoadCached(); ok {
+		eng.Log.Infof("reklam engelleyici: %d alan adı yüklendi", ads.Count())
+	}
+	eng.Ads = ads
 
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
@@ -121,7 +149,8 @@ func run(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	ctl := &control.Server{Engine: eng, Store: store, Token: *token, ProxyPort: port, Shutdown: stop}
+	ctl := &control.Server{Engine: eng, Store: store, Token: *token, ProxyPort: port, Shutdown: stop, Ads: ads}
+	go ctl.RunAdUpdates(ctx)
 	apiLn, err := net.Listen("tcp", *api)
 	if err != nil {
 		return fmt.Errorf("kontrol API portu açılamadı: %w", err)

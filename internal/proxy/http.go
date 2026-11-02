@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -22,6 +23,10 @@ func (e *Engine) serveHTTP(c net.Conn, br *bufio.Reader) {
 	if req.Method == http.MethodConnect {
 		host, port := splitHostPort(req.Host, 443)
 		up, err := e.Dial(context.Background(), host, port)
+		if errors.Is(err, ErrBlocked) {
+			fmt.Fprint(c, "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+			return
+		}
 		if err != nil {
 			e.Stats.Failed.Add(1)
 			e.Log.Warnf("%v", err)
@@ -32,7 +37,7 @@ func (e *Engine) serveHTTP(c net.Conn, br *bufio.Reader) {
 			up.Close()
 			return
 		}
-		e.tunnel(c, br, up, host)
+		e.tunnel(c, br, up, host, port)
 		return
 	}
 	e.forwardHTTP(c, br, req)
@@ -47,6 +52,10 @@ func (e *Engine) forwardHTTP(c net.Conn, br *bufio.Reader, req *http.Request) {
 	}
 	host, port := splitHostPort(req.URL.Host, 80)
 	up, err := e.Dial(context.Background(), host, port)
+	if errors.Is(err, ErrBlocked) {
+		fmt.Fprint(c, "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n")
+		return
+	}
 	if err != nil {
 		e.Stats.Failed.Add(1)
 		e.Log.Warnf("%v", err)
@@ -68,7 +77,7 @@ func (e *Engine) forwardHTTP(c net.Conn, br *bufio.Reader, req *http.Request) {
 	// Yeniden yazılmış istek önce gider. Ardından istemciden gelen her şey
 	// aynı bağlantıya akar; sunucu "Connection: close" gördüğü için kapanır.
 	mr := bufio.NewReaderSize(io.MultiReader(&buf, br), 32<<10)
-	e.tunnel(c, mr, up, host)
+	e.tunnel(c, mr, up, host, port)
 }
 
 func splitHostPort(hp string, def int) (string, int) {

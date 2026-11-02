@@ -5,6 +5,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettings().tabItem { Label("Genel", systemImage: "gearshape") }
+            ProtectionSettings().tabItem { Label("Koruma", systemImage: "shield.lefthalf.filled") }
             DNSSettings().tabItem { Label("DNS", systemImage: "network") }
             DomainSettings().tabItem { Label("Alan adları", systemImage: "list.bullet") }
             LogView().tabItem { Label("Günlük", systemImage: "text.alignleft") }
@@ -47,6 +48,68 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+struct ProtectionSettings: View {
+    @EnvironmentObject private var engine: EngineController
+    @State private var allowText = ""
+    @State private var loaded = false
+
+    private var status: EngineStatus? { engine.status }
+
+    var body: some View {
+        Form {
+            Section("Site başına otomatik öğrenme") {
+                Toggle("Çalışmayan sitede sıradaki yöntemi dene ve hatırla", isOn: Binding(
+                    get: { status?.autoLearn ?? true },
+                    set: { engine.setAutoLearn($0) }
+                ))
+                .disabled(!engine.isRunning)
+                Text("Bir site açılmazsa Slipstream bağlantıyı fark ettirmeden başka bir yöntemle yeniden kurar. Çalışan yöntemi o site için kaydeder, bir dahaki sefere doğrudan onu kullanır.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("Öğrenilen site sayısı: \(status?.learned ?? 0)")
+                    Spacer()
+                    Button("Sıfırla", action: engine.clearLearned)
+                        .disabled(!engine.isRunning || (status?.learned ?? 0) == 0)
+                }
+            }
+            Section("Reklam ve izleyici engelleyici") {
+                Toggle("Reklamları ve izleyicileri engelle", isOn: Binding(
+                    get: { status?.adBlock?.enabled ?? false },
+                    set: { engine.setAdBlock($0) }
+                ))
+                .disabled(!engine.isRunning)
+                if let info = status?.adBlock {
+                    LabeledContent("Listedeki alan adı", value: info.domains.formatted())
+                    LabeledContent("Engellenen istek", value: info.blocked.formatted())
+                }
+                Text("AdGuard DNS filtresi ve StevenBlack listeleri kullanılır, günde bir kez güncellenir. Mac'te ayrıca proxy kullanan bir reklam engelleyici (ör. AdGuard uygulaması) varsa ikisi çakışabilir.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Engellenmeyecek alan adları (her satıra bir tane)").font(.caption)
+                TextEditor(text: $allowText)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 70)
+                HStack {
+                    Button("Listeleri şimdi güncelle", action: engine.updateAdLists)
+                    Spacer()
+                    Button("İstisnaları kaydet") {
+                        let list = allowText.split(whereSeparator: \.isNewline)
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                        engine.setAdBlock(status?.adBlock?.enabled ?? true, allow: list)
+                    }
+                }
+                .disabled(!engine.isRunning)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            guard !loaded else { return }
+            allowText = (status?.adBlock?.allow ?? []).joined(separator: "\n")
+            loaded = true
+        }
     }
 }
 

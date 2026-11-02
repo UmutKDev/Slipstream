@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/UmutKDev/slipstream/internal/adblock"
 	"github.com/UmutKDev/slipstream/internal/config"
 	"github.com/UmutKDev/slipstream/internal/desync"
 	"github.com/UmutKDev/slipstream/internal/dns"
@@ -34,6 +35,7 @@ type Server struct {
 	// ProxyPort, sistem proxy'si açılırken kullanılan porttur.
 	ProxyPort int
 	Shutdown  func()
+	Ads       *adblock.Blocker
 
 	probeMu   sync.Mutex
 	probing   bool
@@ -56,6 +58,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/probe", s.getProbe)
 	mux.HandleFunc("POST /api/systemproxy", s.setSystemProxy)
 	mux.HandleFunc("POST /api/shutdown", s.shutdown)
+	mux.HandleFunc("GET /api/learned", s.getLearned)
+	mux.HandleFunc("DELETE /api/learned", s.clearLearned)
+	mux.HandleFunc("POST /api/autolearn", s.setAutoLearn)
+	mux.HandleFunc("GET /api/adblock", s.getAdBlock)
+	mux.HandleFunc("POST /api/adblock", s.setAdBlock)
+	mux.HandleFunc("POST /api/adblock/update", s.updateAdBlock)
 	return s.auth(mux)
 }
 
@@ -99,6 +107,9 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 		"mode":        c.Mode,
 		"systemProxy": c.SystemProxy,
 		"stats":       s.Engine.Stats.Snapshot(),
+		"autoLearn":   c.AutoLearn,
+		"learned":     len(s.Engine.Learned()),
+		"adBlock":     s.adInfo(),
 	})
 }
 
@@ -280,4 +291,122 @@ func (s *Server) respond(w http.ResponseWriter, c config.Config, err error) {
 		return
 	}
 	writeJSON(w, c)
+}
+
+func (s *Server) getLearned(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, map[string]any{"sites": s.Engine.Learned()})
+}
+
+func (s *Server) clearLearned(w http.ResponseWriter, _ *http.Request) {
+	s.Engine.SetLearned(nil)
+	if s.Engine.OnLearn != nil {
+		s.Engine.OnLearn(map[string]desync.Strategy{})
+	}
+	s.Engine.Log.Infof("öğrenilen site ayarları sıfırlandı")
+	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (s *Server) setAutoLearn(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.Engine.SetAutoLearn(in.Enabled)
+	c, err := s.Store.Update(func(c *config.Config) { c.AutoLearn = in.Enabled })
+	s.respond(w, c, err)
+}
+
+// AdInfo, reklam engelleyicinin durumudur.
+type AdInfo struct {
+	Enabled bool      `json:"enabled"`
+	Domains int       `json:"domains"`
+	Blocked int64     `json:"blocked"`
+	Updated time.Time `json:"updated"`
+	Allow   []string  `json:"allow"`
+}
+
+func (s *Server) adInfo() AdInfo {
+	if s.Ads == nil {
+		return AdInfo{}
+	}
+	return AdInfo{Enabled: s.Ads.Enabled(), Domains: s.Ads.Count(), Blocked: s.Ads.Blocked.Load(), Updated: s.Ads.Updated(), Allow: s.Ads.Allowed()}
+}
+
+func (s *Server) getAdBlock(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, s.adInfo())
+}
+
+func (s *Server) setAdBlock(w http.ResponseWriter, r *http.Request) {
+	if s.Ads == nil {
+		http.Error(w, "reklam engelleyici yok", 501)
+		return
+	}
+	var in struct {
+		Enabled bool     `json:"enabled"`
+		Allow   []string `json:"allow"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	s.Ads.SetEnabled(in.Enabled)
+	if in.Allow != nil {
+		s.Ads.SetAllow(in.Allow)
+	}
+	_, err := s.Store.Update(func(c *config.Config) {
+		c.AdBlock = in.Enabled
+		if in.Allow != nil {
+			c.AdAllow = in.Allow
+		}
+	})
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if in.Enabled && s.Ads.Count() == 0 {
+		go s.runAdUpdate()
+	}
+	s.Engine.Log.Infof("reklam engelleyici: %v", in.Enabled)
+	writeJSON(w, s.adInfo())
+}
+
+func (s *Server) updateAdBlock(w http.ResponseWriter, _ *http.Request) {
+	if s.Ads == nil {
+		http.Error(w, "reklam engelleyici yok", 501)
+		return
+	}
+	go s.runAdUpdate()
+	writeJSON(w, map[string]bool{"started": true})
+}
+
+func (s *Server) runAdUpdate() {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := s.Ads.Update(ctx); err != nil {
+		s.Engine.Log.Warnf("reklam listeleri güncellenemedi: %v", err)
+		return
+	}
+	s.Engine.Log.Infof("reklam listeleri güncellendi: %d alan adı", s.Ads.Count())
+}
+
+// RunAdUpdates, listeleri gerekirse hemen, sonra düzenli olarak günceller.
+func (s *Server) RunAdUpdates(ctx context.Context) {
+	if s.Ads == nil {
+		return
+	}
+	t := time.NewTicker(6 * time.Hour)
+	defer t.Stop()
+	for {
+		if s.Ads.Enabled() && s.Ads.NeedsUpdate(24*time.Hour) {
+			s.runAdUpdate()
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }

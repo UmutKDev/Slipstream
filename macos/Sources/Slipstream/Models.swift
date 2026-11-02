@@ -48,6 +48,20 @@ struct EngineStatus: Codable {
     var mode: String
     var systemProxy: Bool
     var stats: Stats
+    var autoLearn: Bool?
+    var learned: Int?
+    var adBlock: AdBlockInfo?
+}
+
+struct AdBlockInfo: Codable, Hashable {
+    var enabled: Bool
+    var domains: Int
+    var blocked: Int64
+    var updated: String
+    var allow: [String]?
+
+    /// Listeler hiç indirilmediyse Go sıfır zamanı döner.
+    var hasLists: Bool { domains > 0 }
 }
 
 struct Profile: Codable, Identifiable, Hashable {

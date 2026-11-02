@@ -253,6 +253,42 @@ final class EngineController: ObservableObject {
         }
     }
 
+    func setAutoLearn(_ on: Bool) {
+        Task {
+            do {
+                let _: Empty = try await call("POST", "/api/autolearn", body: ["enabled": on])
+                await refresh()
+            } catch { lastError = error.localizedDescription }
+        }
+    }
+
+    func clearLearned() {
+        Task {
+            do {
+                let _: Empty = try await call("DELETE", "/api/learned")
+                await refresh()
+            } catch { lastError = error.localizedDescription }
+        }
+    }
+
+    func setAdBlock(_ on: Bool, allow: [String]? = nil) {
+        struct Body: Encodable { let enabled: Bool; let allow: [String]? }
+        Task {
+            do {
+                let _: Empty = try await call("POST", "/api/adblock", body: Body(enabled: on, allow: allow))
+                await refresh()
+            } catch { lastError = error.localizedDescription }
+        }
+    }
+
+    func updateAdLists() {
+        Task {
+            do {
+                let _: Empty = try await call("POST", "/api/adblock/update")
+            } catch { lastError = error.localizedDescription }
+        }
+    }
+
     func startProbe(apply: Bool = true) {
         Task {
             do {
