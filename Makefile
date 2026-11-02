@@ -11,7 +11,7 @@ engine:
 	go build -o bin/gecitd ./cmd/gecitd
 
 app:
-	VERSION=$(VERSION) ./scripts/build-app.sh
+	VERSION=$(VERSION) bash ./scripts/build-app.sh
 
 # Motoru uygulama olmadan, sistem proxy'si açık biçimde çalıştırır.
 run: engine
