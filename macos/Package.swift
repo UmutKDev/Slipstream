@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "Gecit",
+    name: "Slipstream",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "Gecit",
-            path: "Sources/Gecit"
+            name: "Slipstream",
+            path: "Sources/Slipstream"
         )
     ]
 )

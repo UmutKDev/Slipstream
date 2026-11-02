@@ -1,4 +1,4 @@
-// Package proxy, Geçit'in yerel HTTP ve SOCKS5 proxy motorudur. Tek bir
+// Package proxy, Slipstream'in yerel HTTP ve SOCKS5 proxy motorudur. Tek bir
 // port üzerinden iki protokolü de ilk bayta bakarak ayırt eder.
 package proxy
 
@@ -13,10 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/desync"
-	"github.com/UmutKDev/gecit/internal/dns"
-	"github.com/UmutKDev/gecit/internal/domains"
-	"github.com/UmutKDev/gecit/internal/logx"
+	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/slipstream/internal/dns"
+	"github.com/UmutKDev/slipstream/internal/domains"
+	"github.com/UmutKDev/slipstream/internal/logx"
 )
 
 // Engine, proxy sunucusunun durumunu tutar. Strateji ve çözücü çalışırken

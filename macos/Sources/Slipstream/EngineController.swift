@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// gecitd motorunu başlatır, durdurur ve kontrol API'si üzerinden yönetir.
+/// slipstreamd motorunu başlatır, durdurur ve kontrol API'si üzerinden yönetir.
 @MainActor
 final class EngineController: ObservableObject {
     enum State: Equatable {
@@ -32,7 +32,7 @@ final class EngineController: ObservableObject {
     /// Önceki oturum düzgün kapanmadıysa kalan işaret dosyası.
     private var markerURL: URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Gecit", isDirectory: true)
+            .appendingPathComponent("Slipstream", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("running")
     }
@@ -56,7 +56,7 @@ final class EngineController: ObservableObject {
     func start() {
         guard process == nil else { return }
         guard let bin = engineURL() else {
-            state = .failed("Motor dosyası (gecitd) uygulama paketinde bulunamadı.")
+            state = .failed("Motor dosyası (slipstreamd) uygulama paketinde bulunamadı.")
             return
         }
         state = .starting
@@ -143,11 +143,11 @@ final class EngineController: ObservableObject {
     }
 
     private func engineURL() -> URL? {
-        if let u = Bundle.main.url(forAuxiliaryExecutable: "gecitd") { return u }
-        if let u = Bundle.main.resourceURL?.appendingPathComponent("gecitd"),
+        if let u = Bundle.main.url(forAuxiliaryExecutable: "slipstreamd") { return u }
+        if let u = Bundle.main.resourceURL?.appendingPathComponent("slipstreamd"),
            FileManager.default.isExecutableFile(atPath: u.path) { return u }
         // Geliştirme sırasında: depo kökündeki derlenmiş motor.
-        let dev = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("../bin/gecitd")
+        let dev = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("../bin/slipstreamd")
         return FileManager.default.isExecutableFile(atPath: dev.path) ? dev : nil
     }
 
@@ -269,7 +269,7 @@ final class EngineController: ObservableObject {
         guard let url = URL(string: "http://127.0.0.1:\(apiPort)\(path)") else { throw URLError(.badURL) }
         var req = URLRequest(url: url, timeoutInterval: 5)
         req.httpMethod = method
-        req.setValue(token, forHTTPHeaderField: "X-Gecit-Token")
+        req.setValue(token, forHTTPHeaderField: "X-Slipstream-Token")
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(body)

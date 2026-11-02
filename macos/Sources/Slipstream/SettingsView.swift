@@ -24,7 +24,7 @@ struct GeneralSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Oturum açılınca Geçit'i başlat", isOn: $openAtLogin)
+                Toggle("Oturum açılınca Slipstream'i başlat", isOn: $openAtLogin)
                     .onChange(of: openAtLogin) { on in
                         do {
                             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -40,7 +40,7 @@ struct GeneralSettings: View {
                     get: { systemProxy },
                     set: { engine.setSystemProxy($0) }
                 ))
-                Text("Açıkken Safari, Chrome ve sistem proxy'sine uyan tüm uygulamalar Geçit'ten geçer. Kapalıyken uygulamalara elle 127.0.0.1:\(String(proxyPort)) adresini HTTP ya da SOCKS5 proxy'si olarak girebilirsin.")
+                Text("Açıkken Safari, Chrome ve sistem proxy'sine uyan tüm uygulamalar Slipstream'den geçer. Kapalıyken uygulamalara elle 127.0.0.1:\(String(proxyPort)) adresini HTTP ya da SOCKS5 proxy'si olarak girebilirsin.")
                     .font(.caption).foregroundStyle(.secondary)
                 Stepper("Proxy portu: \(String(proxyPort))", value: $proxyPort, in: 1025...65000)
                     .disabled(engine.isRunning)
@@ -57,7 +57,7 @@ struct DNSSettings: View {
     var body: some View {
         Form {
             Section {
-                Text("ISS'ler engelli siteler için sahte DNS yanıtı döndürür. Geçit adları şifreli DNS (DoH) ile çözer. İlk sağlayıcı yanıt vermezse sıradakine geçer.")
+                Text("ISS'ler engelli siteler için sahte DNS yanıtı döndürür. Slipstream adları şifreli DNS (DoH) ile çözer. İlk sağlayıcı yanıt vermezse sıradakine geçer.")
                     .font(.caption).foregroundStyle(.secondary)
                 ForEach(DNSProviderInfo.all) { p in
                     Toggle(p.name, isOn: Binding(
@@ -150,9 +150,9 @@ struct AboutView: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "shield.lefthalf.filled").font(.system(size: 48)).foregroundStyle(Theme.accent)
-            Text("Geçit").font(.title.bold())
+            Text("Slipstream").font(.title.bold())
             Text("Motor sürümü \(engine.status?.version ?? "–")").foregroundStyle(.secondary)
-            Text("Geçit trafiğini şifrelemez ve IP adresini gizlemez. Yalnız ISS'nin DPI cihazının engelli siteleri tanımasını zorlaştırır.")
+            Text("Slipstream trafiğini şifrelemez ve IP adresini gizlemez. Yalnız ISS'nin DPI cihazının engelli siteleri tanımasını zorlaştırır.")
                 .multilineTextAlignment(.center)
                 .font(.callout)
                 .frame(maxWidth: 420)

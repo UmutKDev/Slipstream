@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/desync"
+	"github.com/UmutKDev/slipstream/internal/desync"
 )
 
 // DefaultTargets, Türkiye'de engelli olduğu bilinen ve deneme için
@@ -136,7 +136,7 @@ func once(ctx context.Context, dial Dialer, st desync.Strategy, host string, o O
 	if err := c.HandshakeContext(ctx); err != nil {
 		return 0, fmt.Errorf("el sıkışma: %w", err)
 	}
-	fmt.Fprintf(c, "HEAD / HTTP/1.1\r\nHost: %s\r\nUser-Agent: Gecit/1.0\r\nConnection: close\r\n\r\n", host)
+	fmt.Fprintf(c, "HEAD / HTTP/1.1\r\nHost: %s\r\nUser-Agent: Slipstream/1.0\r\nConnection: close\r\n\r\n", host)
 	line, err := bufio.NewReader(c).ReadString('\n')
 	if err != nil {
 		return 0, fmt.Errorf("yanıt: %w", err)

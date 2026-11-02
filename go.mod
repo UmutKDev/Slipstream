@@ -1,4 +1,4 @@
-module github.com/UmutKDev/gecit
+module github.com/UmutKDev/slipstream
 
 go 1.26.0
 

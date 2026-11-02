@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/desync"
-	"github.com/UmutKDev/gecit/internal/tlsx"
+	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/slipstream/internal/tlsx"
 )
 
 // httpMethods, düz HTTP isteğini tanımak için kullanılan başlangıçlardır.

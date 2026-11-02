@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct GecitApp: App {
+struct SlipstreamApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
@@ -15,7 +15,7 @@ struct GecitApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Geçit Ayarları", id: "settings") {
+        Window("Slipstream Ayarları", id: "settings") {
             SettingsView()
                 .environmentObject(delegate.engine)
                 .frame(minWidth: 620, minHeight: 440)

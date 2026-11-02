@@ -1,4 +1,4 @@
-// gecitd, Geçit'in DPI atlatma motorudur. Menü çubuğu uygulaması bu
+// slipstreamd, Slipstream'in DPI atlatma motorudur. Menü çubuğu uygulaması bu
 // programı arka planda çalıştırır; tek başına komut satırından da kullanılabilir.
 package main
 
@@ -19,26 +19,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/config"
-	"github.com/UmutKDev/gecit/internal/control"
-	"github.com/UmutKDev/gecit/internal/dns"
-	"github.com/UmutKDev/gecit/internal/domains"
-	"github.com/UmutKDev/gecit/internal/probe"
-	"github.com/UmutKDev/gecit/internal/profile"
-	"github.com/UmutKDev/gecit/internal/proxy"
-	"github.com/UmutKDev/gecit/internal/sysproxy"
+	"github.com/UmutKDev/slipstream/internal/config"
+	"github.com/UmutKDev/slipstream/internal/control"
+	"github.com/UmutKDev/slipstream/internal/dns"
+	"github.com/UmutKDev/slipstream/internal/domains"
+	"github.com/UmutKDev/slipstream/internal/probe"
+	"github.com/UmutKDev/slipstream/internal/profile"
+	"github.com/UmutKDev/slipstream/internal/proxy"
+	"github.com/UmutKDev/slipstream/internal/sysproxy"
 )
 
-const usage = `Geçit — macOS için DPI atlatma motoru
+const usage = `Slipstream — macOS için DPI atlatma motoru
 
 Kullanım:
-  gecitd run      [bayraklar]   Proxy'yi başlatır (varsayılan komut)
-  gecitd probe    [bayraklar]   Hattında çalışan stratejiyi bulur
-  gecitd profiles               Hazır ISS profillerini listeler
-  gecitd sysproxy on|off        Sistem proxy'sini elle açar ya da kapatır
-  gecitd version
+  slipstreamd run      [bayraklar]   Proxy'yi başlatır (varsayılan komut)
+  slipstreamd probe    [bayraklar]   Hattında çalışan stratejiyi bulur
+  slipstreamd profiles               Hazır ISS profillerini listeler
+  slipstreamd sysproxy on|off        Sistem proxy'sini elle açar ya da kapatır
+  slipstreamd version
 
-"gecitd <komut> -h" ile o komutun bayraklarını görebilirsin.
+"slipstreamd <komut> -h" ile o komutun bayraklarını görebilirsin.
 `
 
 func main() {
@@ -61,7 +61,7 @@ func main() {
 	case "sysproxy":
 		err = sysproxyCmd(args)
 	case "version":
-		fmt.Println("gecitd", control.Version)
+		fmt.Println("slipstreamd", control.Version)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
@@ -79,7 +79,7 @@ func run(args []string) error {
 	cfgPath := fs.String("config", config.DefaultPath(), "ayar dosyası")
 	listen := fs.String("listen", "", "proxy adresi (ayar dosyasındakini ezer)")
 	api := fs.String("api", "127.0.0.1:8882", "kontrol API adresi")
-	token := fs.String("token", os.Getenv("GECIT_TOKEN"), "kontrol API belirteci (boşsa rastgele üretilir)")
+	token := fs.String("token", os.Getenv("SLIPSTREAM_TOKEN"), "kontrol API belirteci (boşsa rastgele üretilir)")
 	prof := fs.String("profile", "", "başlangıç profili")
 	sys := fs.Bool("system-proxy", false, "açılışta sistem proxy'sini ayarla, kapanışta geri al")
 	fs.Parse(args)
@@ -141,7 +141,7 @@ func run(args []string) error {
 	// Menü çubuğu uygulaması bu satırı okuyarak motorun hazır olduğunu anlar.
 	ready, _ := json.Marshal(map[string]any{"event": "ready", "proxy": ln.Addr().String(), "api": apiLn.Addr().String(), "version": control.Version})
 	fmt.Println(string(ready))
-	eng.Log.Infof("Geçit %s başladı, profil: %s, DNS: %s", control.Version, cfg.Profile, strings.Join(cfg.DNS, ", "))
+	eng.Log.Infof("Slipstream %s başladı, profil: %s, DNS: %s", control.Version, cfg.Profile, strings.Join(cfg.DNS, ", "))
 
 	err = eng.Serve(ctx, ln)
 

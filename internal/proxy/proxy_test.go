@@ -16,9 +16,9 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	"github.com/UmutKDev/gecit/internal/desync"
-	"github.com/UmutKDev/gecit/internal/dns"
-	"github.com/UmutKDev/gecit/internal/domains"
+	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/slipstream/internal/dns"
+	"github.com/UmutKDev/slipstream/internal/domains"
 )
 
 // fakeDPI, Türkiye'deki SNI filtrelerini taklit eden bir ara kutudur.

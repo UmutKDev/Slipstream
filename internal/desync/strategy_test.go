@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/tlsx"
+	"github.com/UmutKDev/slipstream/internal/tlsx"
 )
 
 func hello(t *testing.T, host string) []byte {

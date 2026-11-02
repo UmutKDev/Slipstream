@@ -13,14 +13,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/config"
-	"github.com/UmutKDev/gecit/internal/desync"
-	"github.com/UmutKDev/gecit/internal/dns"
-	"github.com/UmutKDev/gecit/internal/domains"
-	"github.com/UmutKDev/gecit/internal/probe"
-	"github.com/UmutKDev/gecit/internal/profile"
-	"github.com/UmutKDev/gecit/internal/proxy"
-	"github.com/UmutKDev/gecit/internal/sysproxy"
+	"github.com/UmutKDev/slipstream/internal/config"
+	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/slipstream/internal/dns"
+	"github.com/UmutKDev/slipstream/internal/domains"
+	"github.com/UmutKDev/slipstream/internal/probe"
+	"github.com/UmutKDev/slipstream/internal/profile"
+	"github.com/UmutKDev/slipstream/internal/proxy"
+	"github.com/UmutKDev/slipstream/internal/sysproxy"
 )
 
 // Version, motor sürümüdür.
@@ -61,7 +61,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got := r.Header.Get("X-Gecit-Token")
+		got := r.Header.Get("X-Slipstream-Token")
 		if s.Token == "" || subtle.ConstantTimeCompare([]byte(got), []byte(s.Token)) != 1 {
 			http.Error(w, "yetkisiz", http.StatusUnauthorized)
 			return

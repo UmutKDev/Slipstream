@@ -1,11 +1,11 @@
-# Geçit
+# Slipstream
 
-Geçit, macOS için bir DPI atlatma aracıdır. Türkiye'deki internet servis
+Slipstream, macOS için bir DPI atlatma aracıdır. Türkiye'deki internet servis
 sağlayıcılarının SNI filtrelemesini ve DNS zehirlemesini aşmak için tasarlandı.
 Menü çubuğunda çalışır, tek tıkla açılıp kapanır.
 
-Geçit bir VPN değildir. Trafiğini başka bir ülkeye taşımaz, IP adresini
-gizlemez. Bağlantılar doğrudan hedef sunucuya gider. Geçit yalnız ISS'nin DPI
+Slipstream bir VPN değildir. Trafiğini başka bir ülkeye taşımaz, IP adresini
+gizlemez. Bağlantılar doğrudan hedef sunucuya gider. Slipstream yalnız ISS'nin DPI
 (derin paket incelemesi) cihazının engelli siteyi tanımasını zorlaştırır. Bu
 yüzden hız kaybı neredeyse yoktur.
 
@@ -13,7 +13,7 @@ yüzden hız kaybı neredeyse yoktur.
 
 Türkiye'deki ISS'ler engelli sitelere erişimi üç yolla keser:
 
-| Yöntem | Ne yapar | Geçit ne yapar |
+| Yöntem | Ne yapar | Slipstream ne yapar |
 | --- | --- | --- |
 | DNS zehirleme | Engelli adlar için sahte IP döndürür | Adları şifreli DNS (DoH) ile çözer |
 | SNI filtreleme | HTTPS bağlantısının ilk paketindeki site adını okur ve bağlantıyı keser | İlk paketi (ClientHello) site adının ortasından böler |
@@ -41,14 +41,14 @@ SNI atlatması için üç teknik birlikte ya da ayrı kullanılır:
 | Agresif | 2 baytlık parçalar ve 10 ms gecikme |
 
 ISS kuralları bölgeye ve zamana göre değişir. En güvenilir yol menüdeki
-**"En iyi ayarı otomatik bul"** düğmesidir. Geçit her stratejiyi senin hattında
+**"En iyi ayarı otomatik bul"** düğmesidir. Slipstream her stratejiyi senin hattında
 gerçek sitelerle dener, sertifikayı doğrular ve en hızlı çalışanı seçer.
 
 ## Kurulum
 
 ### Hazır paketten
 
-`Gecit-x.y.z.dmg` dosyasını aç ve Geçit'i Uygulamalar klasörüne sürükle.
+`Slipstream-x.y.z.dmg` dosyasını aç ve Slipstream'i Uygulamalar klasörüne sürükle.
 
 ### Kaynaktan
 
@@ -56,29 +56,29 @@ Gerekenler: macOS 13 veya üstü, Go 1.24+ ve Xcode komut satırı araçları.
 
 ```sh
 make test          # motor testleri
-make app           # build/Gecit.app ve build/Gecit-0.1.0.dmg
+make app           # build/Slipstream.app ve build/Slipstream-0.1.0.dmg
 ```
 
 Developer ID ile imzalamak ve Apple onayından geçirmek için:
 
 ```sh
 DEVELOPER_ID="Developer ID Application: Ad Soyad (TEAMID)" \
-NOTARY_PROFILE="gecit-notary" \
+NOTARY_PROFILE="slipstream-notary" \
 make app
 ```
 
 `NOTARY_PROFILE` profilini bir kez şu komutla kaydedersin:
-`xcrun notarytool store-credentials gecit-notary --apple-id ... --team-id ...`
+`xcrun notarytool store-credentials slipstream-notary --apple-id ... --team-id ...`
 
 ## Komut satırı
 
-Motor (`gecitd`) uygulamadan bağımsız da çalışır:
+Motor (`slipstreamd`) uygulamadan bağımsız da çalışır:
 
 ```sh
-gecitd run -system-proxy        # proxy'yi başlat, sistem proxy'sini ayarla
-gecitd probe                    # hattında çalışan stratejiyi bul
-gecitd profiles                 # profilleri listele
-gecitd sysproxy off             # sistem proxy'sini elle kapat
+slipstreamd run -system-proxy        # proxy'yi başlat, sistem proxy'sini ayarla
+slipstreamd probe                    # hattında çalışan stratejiyi bul
+slipstreamd profiles                 # profilleri listele
+slipstreamd sysproxy off             # sistem proxy'sini elle kapat
 ```
 
 Proxy varsayılan olarak `127.0.0.1:8881` adresinde dinler. Aynı port hem HTTP
@@ -88,8 +88,8 @@ elle girebilirsin.
 ## Mimari
 
 ```
-Geçit.app (SwiftUI, menü çubuğu)
-  └── gecitd (Go motoru)
+Slipstream.app (SwiftUI, menü çubuğu)
+  └── slipstreamd (Go motoru)
         ├── proxy     HTTP CONNECT + SOCKS5, tek port
         ├── desync    ilk paketi bölme stratejileri
         ├── tlsx      ClientHello ayrıştırma, SNI konumu
@@ -105,7 +105,7 @@ gelen istekleri kabul eder. Böylece tarayıcıdaki bir web sayfası motoru
 yönetemez.
 
 Uygulama beklenmedik biçimde kapanırsa sistem proxy'si ölü bir porta işaret
-edebilir. Geçit bir sonraki açılışta bunu fark eder ve proxy ayarını geri alır.
+edebilir. Slipstream bir sonraki açılışta bunu fark eder ve proxy ayarını geri alır.
 
 ## Yol haritası
 

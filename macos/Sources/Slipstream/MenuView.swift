@@ -37,7 +37,7 @@ struct MenuView: View {
                 .font(.title2)
                 .foregroundStyle(engine.isRunning ? Theme.ok : .secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Geçit").font(.headline)
+                Text("Slipstream").font(.headline)
                 Text(subtitle).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()

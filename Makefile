@@ -8,14 +8,14 @@ test:
 
 # Bu Mac için motoru derler (geliştirme).
 engine:
-	go build -o bin/gecitd ./cmd/gecitd
+	go build -o bin/slipstreamd ./cmd/slipstreamd
 
 app:
 	VERSION=$(VERSION) bash ./scripts/build-app.sh
 
 # Motoru uygulama olmadan, sistem proxy'si açık biçimde çalıştırır.
 run: engine
-	./bin/gecitd run -system-proxy
+	./bin/slipstreamd run -system-proxy
 
 clean:
 	rm -rf bin build macos/.build

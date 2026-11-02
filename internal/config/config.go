@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/UmutKDev/gecit/internal/desync"
-	"github.com/UmutKDev/gecit/internal/domains"
-	"github.com/UmutKDev/gecit/internal/profile"
+	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/slipstream/internal/domains"
+	"github.com/UmutKDev/slipstream/internal/profile"
 )
 
 // Config, kalıcı ayarlardır.
@@ -37,13 +37,13 @@ func Default() Config {
 	}
 }
 
-// DefaultPath, macOS'ta ~/Library/Application Support/Gecit/config.json yoludur.
+// DefaultPath, macOS'ta ~/Library/Application Support/Slipstream/config.json yoludur.
 func DefaultPath() string {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		dir = "."
 	}
-	return filepath.Join(dir, "Gecit", "config.json")
+	return filepath.Join(dir, "Slipstream", "config.json")
 }
 
 // Strategy, geçerli stratejiyi döndürür: önce özel, sonra profil.

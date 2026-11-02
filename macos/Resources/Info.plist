@@ -5,13 +5,13 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>tr</string>
 	<key>CFBundleExecutable</key>
-	<string>Gecit</string>
+	<string>Slipstream</string>
 	<key>CFBundleIdentifier</key>
 	<string>__BUNDLE_ID__</string>
 	<key>CFBundleName</key>
-	<string>Geçit</string>
+	<string>Slipstream</string>
 	<key>CFBundleDisplayName</key>
-	<string>Geçit</string>
+	<string>Slipstream</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

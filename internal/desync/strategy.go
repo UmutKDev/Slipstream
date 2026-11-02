@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/UmutKDev/gecit/internal/tlsx"
+	"github.com/UmutKDev/slipstream/internal/tlsx"
 )
 
 // SplitMode, TCP katmanında ilk paketin nasıl bölüneceğini belirler.
