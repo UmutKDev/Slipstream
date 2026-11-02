@@ -25,8 +25,15 @@ done
 lipo -create -output "$OUT/gecitd" "$OUT/gecitd-arm64" "$OUT/gecitd-amd64"
 
 echo "› Uygulama derleniyor"
-(cd "$ROOT/macos" && swift build -c release --arch arm64 --arch x86_64)
-BIN="$ROOT/macos/.build/apple/Products/Release/Gecit"
+# Varsayılan olarak yalnız Apple Silicon. Intel için de derlemek istersen UNIVERSAL=1 ver.
+SWIFT_ARCHS=(--arch arm64)
+[ "${UNIVERSAL:-0}" = "1" ] && SWIFT_ARCHS=(--arch arm64 --arch x86_64)
+(cd "$ROOT/macos" && swift build -c release "${SWIFT_ARCHS[@]}")
+BIN="$(cd "$ROOT/macos" && swift build -c release "${SWIFT_ARCHS[@]}" --show-bin-path)/Gecit"
+if [ ! -x "$BIN" ]; then
+  echo "✗ Swift çıktısı bulunamadı: $BIN" >&2
+  exit 1
+fi
 
 echo "› Paket oluşturuluyor"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
