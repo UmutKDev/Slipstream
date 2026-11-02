@@ -20,6 +20,9 @@ const (
 	SplitSNI   SplitMode = "sni"   // SNI ad alanının içinden böl
 	SplitFixed SplitMode = "fixed" // sabit bayt konumundan böl
 	SplitChunk SplitMode = "chunk" // eşit küçük parçalara böl
+	// SplitMidSLD, ikinci düzey alan adının ortasından böler:
+	// "www.discord.com" için "www.disc" ve "ord.com".
+	SplitMidSLD SplitMode = "midsld"
 )
 
 // Strategy, tek bir atlatma reçetesidir. ISS profilleri bunlardan oluşur.
@@ -32,6 +35,10 @@ type Strategy struct {
 	SplitPos    int       `json:"splitPos,omitempty"`
 	ChunkSize   int       `json:"chunkSize,omitempty"`
 	DelayMs     int       `json:"delayMs,omitempty"` // parçalar arası bekleme
+	// OOB, ilk parçanın sonuna TCP acil veri (urgent) olarak fazladan bir
+	// bayt ekler. Sunucunun TCP yığını bu baytı akıştan çıkarır, ama akışı
+	// yeniden birleştiren DPI cihazı onu alan adının içinde görür.
+	OOB bool `json:"oob,omitempty"`
 
 	// HTTP (80. port)
 	HostCase       bool `json:"hostCase"`       // "Host:" başlığını "hoSt:" yap
@@ -72,6 +79,8 @@ func (s Strategy) PlanTLS(rec []byte) Plan {
 		if info.Length > 4 && !s.RecordSplit {
 			cuts = append(cuts, info.Offset+info.Length/2)
 		}
+	case SplitMidSLD:
+		cuts = append(cuts, info.Offset+MidSLD(info.Host))
 	case SplitFixed, SplitChunk:
 		cuts = append(cuts, s.genericCuts(len(data))...)
 	}
@@ -189,19 +198,44 @@ func (p Plan) Segments() [][]byte {
 	return append(segs, p.Data[prev:])
 }
 
+// MidSLD, ana bilgisayar adında ikinci düzey adın ortasının konumunu döndürür.
+func MidSLD(host string) int {
+	labels := strings.Split(host, ".")
+	if len(labels) < 2 {
+		return len(host) / 2
+	}
+	sld := labels[len(labels)-2]
+	start := len(strings.Join(labels[:len(labels)-2], "."))
+	if start > 0 {
+		start++ // ayırıcı nokta
+	}
+	mid := start + len(sld)/2
+	if mid < 1 {
+		mid = 1
+	}
+	return mid
+}
+
 // Send, planı conn üzerinden parça parça yazar. Her parçanın ayrı bir TCP
 // segmenti olarak çıkması için Nagle algoritması kapatılır.
-func Send(conn net.Conn, p Plan, delay time.Duration) error {
-	if tc, ok := conn.(*net.TCPConn); ok {
+func Send(conn net.Conn, p Plan, s Strategy) error {
+	tc, isTCP := conn.(*net.TCPConn)
+	if isTCP {
 		tc.SetNoDelay(true)
 	}
 	segs := p.Segments()
 	for i, seg := range segs {
-		if _, err := conn.Write(seg); err != nil {
+		var err error
+		if i == 0 && s.OOB && isTCP && len(segs) > 1 {
+			err = sendOOB(tc, seg)
+		} else {
+			_, err = conn.Write(seg)
+		}
+		if err != nil {
 			return err
 		}
-		if i < len(segs)-1 && delay > 0 {
-			time.Sleep(delay)
+		if i < len(segs)-1 && s.DelayMs > 0 {
+			time.Sleep(s.Delay())
 		}
 	}
 	return nil

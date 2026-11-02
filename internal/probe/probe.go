@@ -160,7 +160,7 @@ func (c *Conn) Write(b []byte) (int, error) {
 	}
 	c.sent = true
 	p := c.Strategy.PlanTLS(b)
-	if err := desync.Send(c.Conn, p, c.Strategy.Delay()); err != nil {
+	if err := desync.Send(c.Conn, p, c.Strategy); err != nil {
 		return 0, err
 	}
 	return len(b), nil

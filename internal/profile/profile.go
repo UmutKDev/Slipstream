@@ -95,9 +95,12 @@ func Candidates() []desync.Strategy {
 	c := []desync.Strategy{
 		with(desync.Strategy{Split: desync.SplitFixed, SplitPos: 1}, "ilk-bayt"),
 		with(desync.Strategy{Split: desync.SplitSNI}, "sni"),
+		with(desync.Strategy{Split: desync.SplitMidSLD}, "midsld"),
+		with(desync.Strategy{Split: desync.SplitMidSLD, OOB: true}, "midsld+oob"),
 		with(desync.Strategy{RecordSplit: true}, "kayit"),
 		with(desync.Strategy{RecordSplit: true, Split: desync.SplitSNI}, "kayit+sni"),
 		with(desync.Strategy{RecordSplit: true, Split: desync.SplitSNI, DelayMs: 5}, "kayit+sni+gecikme"),
+		with(desync.Strategy{RecordSplit: true, Split: desync.SplitSNI, OOB: true}, "kayit+sni+oob"),
 		with(desync.Strategy{RecordSplit: true, Split: desync.SplitChunk, ChunkSize: 8, DelayMs: 1}, "kayit+parca8"),
 		with(desync.Strategy{RecordSplit: true, Split: desync.SplitChunk, ChunkSize: 2, DelayMs: 10}, "agresif"),
 	}

@@ -83,7 +83,7 @@ func (e *Engine) sendFirst(br *bufio.Reader, up net.Conn, host string, st desync
 		}
 		e.Stats.Bypassed.Add(1)
 		e.Log.Infof("TLS %s → %s (%d parça)", host, st.Name, len(p.Cuts)+1)
-		return desync.Send(up, p, st.Delay())
+		return desync.Send(up, p, st)
 	case isHTTP(br):
 		req := readHTTPHead(br)
 		if !e.Domains.Apply(host) {
@@ -93,7 +93,7 @@ func (e *Engine) sendFirst(br *bufio.Reader, up net.Conn, host string, st desync
 		p := st.PlanHTTP(req)
 		e.Stats.Bypassed.Add(1)
 		e.Log.Infof("HTTP %s → %s", host, st.Name)
-		return desync.Send(up, p, st.Delay())
+		return desync.Send(up, p, st)
 	}
 	return nil
 }

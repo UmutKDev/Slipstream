@@ -56,8 +56,11 @@ func fakeDPI(t *testing.T, backend string, banned string) string {
 				}
 				defer b.Close()
 				b.Write(first)
-				go io.Copy(b, c)
-				io.Copy(c, b)
+				// Linux'ta TCPConn'lar arası io.Copy splice kullanır ve splice
+				// TCP acil verisinde takılır. Gerçek bir DPI pasif dinlediği için
+				// bu sorun yaşanmaz; burada düz okuma/yazmaya zorluyoruz.
+				go io.Copy(b, struct{ io.Reader }{c})
+				io.Copy(c, struct{ io.Reader }{b})
 			}(c)
 		}
 	}()
@@ -116,6 +119,7 @@ func TestHTTPSBypassThroughHTTPProxy(t *testing.T) {
 		{Name: "sni", Split: desync.SplitSNI, DelayMs: 20},
 		{Name: "kayit", RecordSplit: true, DelayMs: 20},
 		{Name: "parca", RecordSplit: true, Split: desync.SplitChunk, ChunkSize: 8, DelayMs: 5},
+		{Name: "midsld+oob", Split: desync.SplitMidSLD, OOB: true, DelayMs: 20},
 	} {
 		addr := startEngine(t, st, banned, dpi)
 		code, err := httpsVia(addr, target)

@@ -71,3 +71,17 @@ func TestPlanHTTP(t *testing.T) {
 		t.Fatalf("host %q", p.Host)
 	}
 }
+
+func TestMidSLD(t *testing.T) {
+	cases := map[string]string{
+		"discord.com":      "dis",
+		"www.discord.com":  "www.dis",
+		"cdn.x.roblox.com": "cdn.x.rob",
+		"localhost":        "loca",
+	}
+	for host, want := range cases {
+		if got := host[:MidSLD(host)]; got != want {
+			t.Errorf("%s: %q, beklenen %q", host, got, want)
+		}
+	}
+}
