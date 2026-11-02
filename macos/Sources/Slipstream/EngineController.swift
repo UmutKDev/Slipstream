@@ -13,7 +13,7 @@ final class EngineController: ObservableObject {
 
     @Published private(set) var state: State = .stopped
     @Published private(set) var status: EngineStatus?
-    @Published private(set) var profiles: [Profile] = []
+    @Published private(set) var profiles: [Profile] = Profile.builtin
     @Published private(set) var logs: [LogEntry] = []
     @Published private(set) var probe: ProbeStatus?
     @Published var lastError: String?
@@ -22,6 +22,7 @@ final class EngineController: ObservableObject {
     @AppStorage("proxyPort") var proxyPort = 8881
     @AppStorage("apiPort") var apiPort = 8882
     @AppStorage("startOnLaunch") var startOnLaunch = true
+    @AppStorage("profile") var selectedProfile = "dengeli"
 
     private var process: Process?
     private var pollTask: Task<Void, Never>?
@@ -66,7 +67,8 @@ final class EngineController: ObservableObject {
         var args = ["run",
                     "-listen", "127.0.0.1:\(proxyPort)",
                     "-api", "127.0.0.1:\(apiPort)",
-                    "-token", token]
+                    "-token", token,
+                    "-profile", selectedProfile]
         if useSystemProxy { args.append("-system-proxy") }
         p.arguments = args
 
@@ -183,7 +185,10 @@ final class EngineController: ObservableObject {
 
     func refresh() async {
         guard isRunning else { return }
-        if let s: EngineStatus = try? await call("GET", "/api/status") { status = s }
+        if let s: EngineStatus = try? await call("GET", "/api/status") {
+            status = s
+            if selectedProfile != s.profile { selectedProfile = s.profile }
+        }
         if let l: LogsResponse = try? await call("GET", "/api/logs?since=\(lastLogSeq)"),
            let entries = l.entries, !entries.isEmpty {
             logs.append(contentsOf: entries)
@@ -196,10 +201,13 @@ final class EngineController: ObservableObject {
     }
 
     func loadProfiles() async {
-        if let r: ProfilesResponse = try? await call("GET", "/api/profiles") { profiles = r.profiles }
+        if let r: ProfilesResponse = try? await call("GET", "/api/profiles"), !r.profiles.isEmpty { profiles = r.profiles }
     }
 
     func selectProfile(_ id: String) {
+        selectedProfile = id
+        objectWillChange.send()
+        guard isRunning else { return }
         Task {
             do {
                 let _: Empty = try await call("POST", "/api/profile", body: ["id": id])

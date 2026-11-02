@@ -28,7 +28,7 @@ struct MenuBarIcon: View {
     @EnvironmentObject private var engine: EngineController
 
     var body: some View {
-        Image(systemName: engine.isRunning ? "shield.lefthalf.filled" : "shield.slash")
+        Image(systemName: engine.isRunning ? "bolt.shield.fill" : "bolt.shield")
     }
 }
 

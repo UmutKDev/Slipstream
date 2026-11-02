@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Theme {
-    static let accent = Color(red: 0.89, green: 0.12, blue: 0.20) // Türk kırmızısı
+    static let accent = Color(red: 0.38, green: 0.42, blue: 0.98) // Slipstream mavisi
     static let ok = Color(red: 0.16, green: 0.72, blue: 0.45)
     static let warn = Color.orange
 

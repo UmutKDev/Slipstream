@@ -57,6 +57,20 @@ struct Profile: Codable, Identifiable, Hashable {
     var dns: [String]
 }
 
+extension Profile {
+    /// Motor kapalıyken de seçim yapılabilsin diye uygulamaya gömülü liste.
+    /// Motor açılınca kendi listesiyle değiştirilir.
+    static let builtin: [Profile] = [
+        .init(id: "dengeli", name: "Dengeli (önerilen)", description: "", dns: []),
+        .init(id: "turktelekom", name: "Türk Telekom", description: "", dns: []),
+        .init(id: "superonline", name: "Turkcell Superonline", description: "", dns: []),
+        .init(id: "vodafone", name: "Vodafone Net", description: "", dns: []),
+        .init(id: "turknet", name: "TurkNet", description: "", dns: []),
+        .init(id: "millenicom", name: "Millenicom ve diğer altyapılar", description: "", dns: []),
+        .init(id: "agresif", name: "Agresif", description: "", dns: []),
+    ]
+}
+
 struct ProfilesResponse: Codable {
     var profiles: [Profile]
 }
