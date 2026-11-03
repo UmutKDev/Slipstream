@@ -278,3 +278,13 @@ struct Sparkline: View {
         }
     }
 }
+
+extension ISO8601DateFormatter {
+    private static let plain = ISO8601DateFormatter()
+
+    /// Go'nun zaman damgasını (kesirli saniyesi 9 haneye kadar olabilir) okur.
+    static func goDate(_ s: String) -> Date? {
+        let trimmed = s.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
+        return plain.date(from: trimmed)
+    }
+}

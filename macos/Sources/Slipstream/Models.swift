@@ -61,6 +61,9 @@ struct AdBlockInfo: Codable, Hashable {
     var blocked: Int64
     var updated: String
     var allow: [String]?
+    var lists: [String]?
+    var catalog: [AdListInfo]?
+    var updating: Bool?
 
     /// Listeler hiç indirilmediyse Go sıfır zamanı döner.
     var hasLists: Bool { domains > 0 }
@@ -157,4 +160,13 @@ struct DNSProviderInfo: Identifiable, Hashable {
 struct RateSample: Hashable {
     var up: Double
     var down: Double
+}
+
+/// Seçilebilir reklam engel listesi.
+struct AdListInfo: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var description: String
+    var url: String
+    var `default`: Bool
 }

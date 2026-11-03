@@ -27,6 +27,7 @@ type Config struct {
 	AutoLearn   bool             `json:"autoLearn"` // çalışmayan sitede sıradaki stratejiyi dene ve hatırla
 	AdBlock     bool             `json:"adBlock"`   // reklam ve izleyici engelleyici
 	AdAllow     []string         `json:"adAllow"`   // reklam engelleyicinin dokunmayacağı alan adları
+	AdLists     []string         `json:"adLists"`   // kullanılan engel listeleri (boşsa varsayılanlar)
 }
 
 // Default, ilk açılış ayarlarıdır.

@@ -418,8 +418,29 @@ struct ProtectionSettings: View {
             }
         }
 
+        if engine.proxyMode == "pac" && status?.adBlock?.enabled == true {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Reklam engelleyici şu an yalnız Alan adları listesindeki sitelerde çalışıyor.")
+                        .font(.callout.weight(.medium))
+                    Text("Yönlendirme \"Yalnız engelli siteler\" kipinde; film sitesi gibi diğer siteler Slipstream'e hiç uğramadığı için reklamları da engellenemez.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button("Tüm trafiğe geç") { engine.setProxyMode("global") }
+                    .glassButton(prominent: true)
+                    .tint(Theme.warn)
+                    .controlSize(.small)
+            }
+            .padding(12)
+            .glassSurface(cornerRadius: 14, tint: Theme.warn.opacity(0.3))
+        }
+
         SettingsCard(title: "Reklam ve izleyici engelleyici",
-                     footer: "AdGuard DNS filtresi ve StevenBlack listeleri kullanılır, günde bir kez güncellenir. Proxy kullanan başka bir reklam engelleyiciyle çakışabilir.") {
+                     footer: "Slipstream reklamları alan adı düzeyinde keser: reklam sunucusuna giden bağlantı hiç kurulmaz. Proxy kullanan başka bir reklam engelleyiciyle çakışabilir.") {
             SettingRow(symbol: "hand.raised.fill", color: .red,
                        title: "Reklamları ve izleyicileri engelle",
                        detail: adDetail) {
@@ -427,11 +448,37 @@ struct ProtectionSettings: View {
                     .disabled(!engine.isRunning)
             }
             SettingRow(symbol: "arrow.triangle.2.circlepath", color: .gray,
-                       title: "Engel listeleri",
-                       detail: "Listeleri beklemeden yeniden indir.",
+                       title: "Listeleri güncelle",
+                       detail: updatedText,
                        divider: false) {
-                Button("Şimdi güncelle", action: engine.updateAdLists)
-                    .disabled(!engine.isRunning)
+                HStack(spacing: 8) {
+                    if status?.adBlock?.updating == true { ProgressView().controlSize(.small) }
+                    Button("Şimdi güncelle", action: engine.updateAdLists)
+                        .disabled(!engine.isRunning || status?.adBlock?.updating == true)
+                }
+            }
+        }
+
+        if let catalog = status?.adBlock?.catalog, !catalog.isEmpty {
+            let active = status?.adBlock?.lists ?? []
+            SettingsCard(title: "Engel listeleri",
+                         footer: "Listeler GitHub'daki açık kaynak projelerden indirilir ve günde bir kez güncellenir. Yeni açtığın liste arka planda iner.") {
+                ForEach(Array(catalog.enumerated()), id: \.element.id) { i, l in
+                    SettingRow(symbol: listIcon(l.id), color: listColor(l.id),
+                               title: l.name,
+                               detail: l.description,
+                               divider: i < catalog.count - 1) {
+                        SwitchView(isOn: Binding(
+                            get: { active.contains(l.id) },
+                            set: { on in
+                                var ids = active.filter { $0 != l.id }
+                                if on { ids.append(l.id) }
+                                engine.setAdLists(ids.isEmpty ? [l.id] : ids)
+                            }
+                        ))
+                        .disabled(!engine.isRunning || (active == [l.id]))
+                    }
+                }
             }
         }
 
@@ -450,6 +497,41 @@ struct ProtectionSettings: View {
             guard !loaded else { return }
             allowText = (status?.adBlock?.allow ?? []).joined(separator: "\n")
             loaded = true
+        }
+    }
+
+    private var updatedText: String {
+        guard let info = status?.adBlock, engine.isRunning else { return "Koruma açıkken güncellenir." }
+        if info.updating == true { return "Listeler indiriliyor…" }
+        if let d = ISO8601DateFormatter.goDate(info.updated), d.timeIntervalSince1970 > 0 {
+            let f = RelativeDateTimeFormatter()
+            f.locale = Locale(identifier: "tr_TR")
+            return "Son güncelleme \(f.localizedString(for: d, relativeTo: Date()))."
+        }
+        return "Listeleri beklemeden yeniden indir."
+    }
+
+    private func listIcon(_ id: String) -> String {
+        switch id {
+        case "video-ads": return "play.rectangle.fill"
+        case "hagezi-pro": return "shield.checkered"
+        case "hagezi-popup": return "macwindow.badge.plus"
+        case "turk-adlist": return "flag.fill"
+        case "adguard-dns": return "a.circle.fill"
+        case "hagezi-tif": return "exclamationmark.shield.fill"
+        default: return "list.bullet"
+        }
+    }
+
+    private func listColor(_ id: String) -> Color {
+        switch id {
+        case "video-ads": return .pink
+        case "hagezi-pro": return Theme.accent
+        case "hagezi-popup": return .orange
+        case "turk-adlist": return .red
+        case "adguard-dns": return Theme.ok
+        case "hagezi-tif": return .purple
+        default: return .gray
         }
     }
 

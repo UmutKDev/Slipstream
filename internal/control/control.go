@@ -43,6 +43,8 @@ type Server struct {
 	sysGen  atomic.Uint64
 	sysBusy atomic.Bool
 
+	adUpdating atomic.Bool
+
 	probeMu   sync.Mutex
 	probing   bool
 	lastProbe *probe.Report
@@ -384,18 +386,25 @@ func (s *Server) setAutoLearn(w http.ResponseWriter, r *http.Request) {
 
 // AdInfo, reklam engelleyicinin durumudur.
 type AdInfo struct {
-	Enabled bool      `json:"enabled"`
-	Domains int       `json:"domains"`
-	Blocked int64     `json:"blocked"`
-	Updated time.Time `json:"updated"`
-	Allow   []string  `json:"allow"`
+	Enabled  bool           `json:"enabled"`
+	Domains  int            `json:"domains"`
+	Blocked  int64          `json:"blocked"`
+	Updated  time.Time      `json:"updated"`
+	Allow    []string       `json:"allow"`
+	Lists    []string       `json:"lists"`
+	Catalog  []adblock.List `json:"catalog"`
+	Updating bool           `json:"updating"`
 }
 
 func (s *Server) adInfo() AdInfo {
 	if s.Ads == nil {
 		return AdInfo{}
 	}
-	return AdInfo{Enabled: s.Ads.Enabled(), Domains: s.Ads.Count(), Blocked: s.Ads.Blocked.Load(), Updated: s.Ads.Updated(), Allow: s.Ads.Allowed()}
+	return AdInfo{
+		Enabled: s.Ads.Enabled(), Domains: s.Ads.Count(), Blocked: s.Ads.Blocked.Load(),
+		Updated: s.Ads.Updated(), Allow: s.Ads.Allowed(), Lists: s.Ads.ListIDs(),
+		Catalog: adblock.Catalog, Updating: s.adUpdating.Load(),
+	}
 }
 
 func (s *Server) getAdBlock(w http.ResponseWriter, _ *http.Request) {
@@ -410,6 +419,7 @@ func (s *Server) setAdBlock(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Enabled bool     `json:"enabled"`
 		Allow   []string `json:"allow"`
+		Lists   []string `json:"lists"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -419,17 +429,24 @@ func (s *Server) setAdBlock(w http.ResponseWriter, r *http.Request) {
 	if in.Allow != nil {
 		s.Ads.SetAllow(in.Allow)
 	}
+	missing := false
+	if in.Lists != nil {
+		missing = s.Ads.SetLists(in.Lists)
+	}
 	_, err := s.Store.Update(func(c *config.Config) {
 		c.AdBlock = in.Enabled
 		if in.Allow != nil {
 			c.AdAllow = in.Allow
+		}
+		if in.Lists != nil {
+			c.AdLists = s.Ads.ListIDs()
 		}
 	})
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	if in.Enabled && s.Ads.Count() == 0 {
+	if in.Enabled && (s.Ads.Count() == 0 || missing) {
 		go s.runAdUpdate()
 	}
 	s.Engine.Log.Infof("reklam engelleyici: %v", in.Enabled)
@@ -446,6 +463,10 @@ func (s *Server) updateAdBlock(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) runAdUpdate() {
+	if !s.adUpdating.CompareAndSwap(false, true) {
+		return // zaten güncelleniyor
+	}
+	defer s.adUpdating.Store(false)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := s.Ads.Update(ctx); err != nil {
@@ -456,9 +477,13 @@ func (s *Server) runAdUpdate() {
 }
 
 // RunAdUpdates, listeleri gerekirse hemen, sonra düzenli olarak günceller.
-func (s *Server) RunAdUpdates(ctx context.Context) {
+// missing, diskte henüz olmayan bir liste seçildiğini bildirir.
+func (s *Server) RunAdUpdates(ctx context.Context, missing bool) {
 	if s.Ads == nil {
 		return
+	}
+	if missing && s.Ads.Enabled() {
+		s.runAdUpdate()
 	}
 	t := time.NewTicker(6 * time.Hour)
 	defer t.Stop()

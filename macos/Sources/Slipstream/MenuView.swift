@@ -158,6 +158,7 @@ struct MenuView: View {
         guard isOn, let info else { return "Koruma açıkken çalışır" }
         if !info.enabled { return "Kapalı" }
         if !info.hasLists { return "Listeler indiriliyor…" }
+        if engine.proxyMode == "pac" { return "Yalnız listedeki sitelerde · \(info.blocked) engellendi" }
         return "\(info.blocked) istek engellendi · \(info.domains.formatted()) alan adı"
     }
 

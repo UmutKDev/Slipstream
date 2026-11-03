@@ -322,6 +322,19 @@ final class EngineController: ObservableObject {
         }
     }
 
+    /// Kullanılacak engel listelerini değiştirir; yeni listeler arka planda iner.
+    func setAdLists(_ ids: [String]) {
+        struct Body: Encodable { let enabled: Bool; let lists: [String] }
+        guard isRunning else { return }
+        let enabled = status?.adBlock?.enabled ?? true
+        Task {
+            do {
+                let _: Empty = try await call("POST", "/api/adblock", body: Body(enabled: enabled, lists: ids))
+                await refresh()
+            } catch { lastError = error.localizedDescription }
+        }
+    }
+
     func updateAdLists() {
         Task {
             do {

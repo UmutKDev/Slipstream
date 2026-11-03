@@ -125,6 +125,7 @@ func run(args []string) error {
 	ads := adblock.New(filepath.Join(dataDir, "adblock"))
 	ads.SetAllow(cfg.AdAllow)
 	ads.SetEnabled(cfg.AdBlock)
+	adMissing := ads.SetLists(cfg.AdLists)
 	// Listeler de engelli olabilir; motorun DoH çözücüsüyle indirilir.
 	ads.Client = &http.Client{Timeout: time.Minute, Transport: &http.Transport{
 		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
@@ -154,7 +155,7 @@ func run(args []string) error {
 	defer stop()
 
 	ctl := &control.Server{Engine: eng, Store: store, Token: *token, ProxyPort: port, Shutdown: stop, Ads: ads}
-	go ctl.RunAdUpdates(ctx)
+	go ctl.RunAdUpdates(ctx, adMissing)
 	// PAC kipinde yeni öğrenilen site PAC dosyasına girer; sistemin
 	// dosyayı yeniden okuması için adres yenilenir.
 	onLearned = func() { go ctl.RefreshPAC() }
