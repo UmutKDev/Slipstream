@@ -39,7 +39,8 @@ platform :ios do
       clean: true,
       output_directory: "../build/ios-testflight",
       xcargs: "CURRENT_PROJECT_VERSION=#{build} #{signing}",
-      export_xcargs: signing,
+      # gym xcargs'ı dışa aktarmaya da ekliyor; export_xcargs ile aynı
+      # bayraklar iki kez gidince xcodebuild 64 koduyla çıkıyor.
       export_options: { signingStyle: "automatic", teamID: ENV["DEVELOPMENT_TEAM"].to_s }
     )
 
