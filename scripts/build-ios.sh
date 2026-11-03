@@ -87,7 +87,10 @@ PY
   --testflight)
     need fastlane "Homebrew ile kur: brew install fastlane"
     # App Store Connect API anahtarı: fastlane'in kullandığı .p8 dosyası.
-    KEY_PATH="${ASC_KEY_PATH:-$(ls ~/.appstoreconnect/private_keys/AuthKey_*.p8 ~/private_keys/AuthKey_*.p8 2>/dev/null | head -1 || true)}"
+    # altool/fastlane'in baktığı klasörler, sonra İndirilenler ve Belgeler.
+    KEY_PATH="${ASC_KEY_PATH:-$(ls ~/.appstoreconnect/private_keys/AuthKey_*.p8 ~/private_keys/AuthKey_*.p8 \
+      ~/.private_keys/AuthKey_*.p8 ./private_keys/AuthKey_*.p8 ~/Downloads/AuthKey_*.p8 ~/Documents/AuthKey_*.p8 \
+      2>/dev/null | head -1 || true)}"
     [ -f "$KEY_PATH" ] || { echo "hata: App Store Connect API anahtarı (.p8) bulunamadı. ASC_KEY_PATH ile ver." >&2; exit 1; }
     KEY_ID="${ASC_KEY_ID:-$(basename "$KEY_PATH" .p8 | sed 's/^AuthKey_//')}"
     ISSUER_FILE="$HOME/.appstoreconnect/issuer_id"
