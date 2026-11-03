@@ -17,6 +17,8 @@ final class EngineController: ObservableObject {
     @Published private(set) var logs: [LogEntry] = []
     @Published private(set) var probe: ProbeStatus?
     @Published var lastError: String?
+    /// Kullanıcının seçtiği ama motorun henüz uygulamadığı yönlendirme kipi.
+    @Published private(set) var pendingProxyMode: String?
     /// Son ölçümlerdeki indirme ve yükleme hızı (bayt/sn), en eskisi başta.
     @Published private(set) var rateHistory: [RateSample] = []
 
@@ -249,14 +251,22 @@ final class EngineController: ObservableObject {
         Task { let _: Empty? = try? await call("POST", "/api/dns/flush") }
     }
 
+    /// Ekranda gösterilecek yönlendirme kipi; seçim anında yansır.
+    var proxyMode: String { pendingProxyMode ?? status?.proxyMode ?? "global" }
+
+    /// Sistem proxy'si değiştiriliyor mu (networksetup birkaç saniye sürebilir).
+    var proxyApplying: Bool { pendingProxyMode != nil || status?.proxyBusy == true }
+
     func setProxyMode(_ mode: String) {
         struct Body: Encodable { let enabled: Bool; let mode: String }
-        guard isRunning else { return }
+        guard isRunning, mode != proxyMode else { return }
+        pendingProxyMode = mode
         Task {
             do {
                 let _: Empty = try await call("POST", "/api/systemproxy", body: Body(enabled: useSystemProxy, mode: mode))
                 await refresh()
             } catch { lastError = error.localizedDescription }
+            if pendingProxyMode == mode { pendingProxyMode = nil }
         }
     }
 

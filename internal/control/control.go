@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/UmutKDev/Slipstream/internal/adblock"
@@ -37,6 +38,10 @@ type Server struct {
 	ProxyPort int
 	Shutdown  func()
 	Ads       *adblock.Blocker
+
+	sysMu   sync.Mutex
+	sysGen  atomic.Uint64
+	sysBusy atomic.Bool
 
 	probeMu   sync.Mutex
 	probing   bool
@@ -108,6 +113,7 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 		"mode":        c.Mode,
 		"systemProxy": c.SystemProxy,
 		"proxyMode":   c.ProxyMode,
+		"proxyBusy":   s.sysBusy.Load(),
 		"stats":       s.Engine.Stats.Snapshot(),
 		"autoLearn":   c.AutoLearn,
 		"learned":     len(s.Engine.Learned()),
@@ -277,21 +283,41 @@ func (s *Server) setSystemProxy(w http.ResponseWriter, r *http.Request) {
 		}
 		mode = in.Mode
 	}
+	c, err := s.Store.Update(func(c *config.Config) { c.SystemProxy = in.Enabled; c.ProxyMode = mode })
+	// networksetup her ağ hizmeti için ayrı çalıştığından birkaç saniye
+	// sürebilir. Yanıt hemen döner, ayar arka planda sırayla uygulanır.
+	go s.applySystemProxy(in.Enabled, sysproxy.Mode(mode))
+	s.respond(w, c, err)
+}
+
+// applySystemProxy, sistem proxy'sini sırayla değiştirir. Arka arkaya gelen
+// isteklerde yalnız sonuncusu uygulanır.
+func (s *Server) applySystemProxy(enabled bool, mode sysproxy.Mode) {
+	gen := s.sysGen.Add(1)
+	s.sysMu.Lock()
+	defer s.sysMu.Unlock()
+	if s.sysGen.Load() != gen {
+		return // daha yeni bir istek geldi
+	}
+	s.sysBusy.Store(true)
+	defer s.sysBusy.Store(false)
 	var err error
-	if in.Enabled {
-		// Kip değişirken eski ayar kalmasın.
-		sysproxy.Disable()
-		err = s.ApplySystemProxy(sysproxy.Mode(mode))
+	if enabled {
+		err = s.ApplySystemProxy(mode)
 	} else {
 		err = sysproxy.Disable()
 	}
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		s.Engine.Log.Errorf("sistem proxy'si değiştirilemedi: %v", err)
 		return
 	}
-	c, err := s.Store.Update(func(c *config.Config) { c.SystemProxy = in.Enabled; c.ProxyMode = mode })
-	s.Engine.Log.Infof("sistem proxy'si: %v (%s)", in.Enabled, mode)
-	s.respond(w, c, err)
+	if !enabled {
+		s.Engine.Log.Infof("sistem proxy'si kapatıldı")
+	} else if mode == sysproxy.ModePAC {
+		s.Engine.Log.Infof("sistem proxy'si PAC kipinde: yalnız listedeki siteler geçer")
+	} else {
+		s.Engine.Log.Infof("sistem proxy'si tüm trafik kipinde")
+	}
 }
 
 // ApplySystemProxy, sistem proxy'sini kipe göre ayarlar. PAC adresine bir
@@ -308,6 +334,8 @@ func (s *Server) RefreshPAC() {
 	if !c.SystemProxy || c.ProxyMode != string(sysproxy.ModePAC) || !sysproxy.Supported {
 		return
 	}
+	s.sysMu.Lock()
+	defer s.sysMu.Unlock()
 	if err := s.ApplySystemProxy(sysproxy.ModePAC); err != nil {
 		s.Engine.Log.Warnf("PAC yenilenemedi: %v", err)
 	}

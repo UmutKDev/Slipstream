@@ -47,6 +47,8 @@ func Enable(host string, port int) error {
 			{"-setwebproxy", s, host, p},
 			{"-setsecurewebproxy", s, host, p},
 			{"-setproxybypassdomains", s},
+			// PAC kipinden geçerken otomatik yapılandırma açık kalmasın.
+			{"-setautoproxystate", s, "off"},
 		} {
 			if cmd[0] == "-setproxybypassdomains" {
 				cmd = append(cmd, Bypass...)

@@ -267,7 +267,7 @@ struct GeneralSettings: View {
     @AppStorage("proxyPort") private var proxyPort = 8881
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
 
-    private var mode: String { engine.status?.proxyMode ?? "global" }
+    private var mode: String { engine.proxyMode }
 
     var body: some View {
         SettingsCard(title: "Açılış") {
@@ -303,10 +303,17 @@ struct GeneralSettings: View {
         }
 
         VStack(alignment: .leading, spacing: 6) {
-            Text("YÖNLENDİRME")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 4)
+            HStack(spacing: 6) {
+                Text("YÖNLENDİRME")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                if engine.proxyApplying {
+                    ProgressView().controlSize(.mini)
+                    Text("Sistem ayarı değiştiriliyor…").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.leading, 4)
+            .animation(.easeInOut(duration: 0.2), value: engine.proxyApplying)
             HStack(spacing: 12) {
                 ModeCard(symbol: "globe.europe.africa.fill",
                          title: "Tüm trafik",
