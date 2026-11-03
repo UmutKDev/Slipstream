@@ -92,6 +92,7 @@ struct SettingsView: View {
             .id(current)
         }
         .frame(minWidth: 720, minHeight: 520)
+        .transparentToolbar()
     }
 }
 
@@ -135,7 +136,7 @@ private struct PaneContainer<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(AuroraBackground(active: engine.isRunning, intensity: 0.6).ignoresSafeArea())
+        .background { AuroraBackground(active: engine.isRunning, intensity: 0.6).extendsUnderSidebar().ignoresSafeArea() }
     }
 }
 
@@ -353,11 +354,14 @@ private struct ModeCard: View {
                 HStack {
                     Image(systemName: symbol)
                         .font(.title2)
-                        .foregroundStyle(selected ? Theme.accent : .secondary)
+                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                        .shadow(color: selected ? Theme.accent : .clear, radius: 6)
                     Spacer()
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
-                        .foregroundStyle(selected ? Theme.accent : Color.secondary.opacity(0.5))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(selected ? Color.white : Color.secondary.opacity(0.5),
+                                         selected ? Theme.accent : Color.clear)
                 }
                 Text(title).font(.headline)
                 Text(detail)
@@ -496,6 +500,9 @@ struct DNSSettings: View {
                         get: { selected.contains(p.id) },
                         set: { on in
                             if on { selected.append(p.id) } else { selected.removeAll { $0 == p.id } }
+                            // Öncelik, listedeki görünüm sırasını izler.
+                            let order = DNSProviderInfo.all.map(\.id)
+                            selected.sort { (order.firstIndex(of: $0) ?? 0) < (order.firstIndex(of: $1) ?? 0) }
                         }
                     ))
                 }

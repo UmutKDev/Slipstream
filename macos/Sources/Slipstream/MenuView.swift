@@ -179,7 +179,7 @@ struct MenuView: View {
                 .pickerStyle(.menu)
                 .fixedSize()
                 if isOn, let st = engine.status?.strategy {
-                    Text(st.summary).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    Text(st.summary).font(.caption2).foregroundStyle(.secondary).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 0)

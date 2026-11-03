@@ -115,6 +115,30 @@ extension View {
     }
 }
 
+extension View {
+    /// macOS 26'da arka planı yüzen kenar çubuğunun altına da uzatır.
+    @ViewBuilder
+    func extendsUnderSidebar() -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) { self.backgroundExtensionEffect() } else { self }
+        #else
+        self
+        #endif
+    }
+
+    /// Pencere araç çubuğunun düz zeminini kaldırır; renkler başlığa kadar akar.
+    @ViewBuilder
+    func transparentToolbar() -> some View {
+        #if compiler(>=6.0)
+        if #available(macOS 15.0, *) {
+            self.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        } else { self }
+        #else
+        self
+        #endif
+    }
+}
+
 /// Yakın cam yüzeylerin birbirine akarak birleşmesini sağlar (macOS 26).
 struct GlassGroup<Content: View>: View {
     var spacing: CGFloat = 12
