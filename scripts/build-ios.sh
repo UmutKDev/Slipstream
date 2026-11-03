@@ -36,10 +36,11 @@ team_from_cert() {
   security find-certificate -c "$1" -p 2>/dev/null \
     | openssl x509 -noout -subject 2>/dev/null \
     | sed -nE 's/.*OU ?= ?([A-Z0-9]{10}).*/\1/p' | head -1
+  return 0
 }
 TEAM="${DEVELOPMENT_TEAM:-}"
-[ -n "$TEAM" ] || TEAM="$(team_from_cert "Apple Development")"
-[ -n "$TEAM" ] || TEAM="$(team_from_cert "Developer ID Application")"
+[ -n "$TEAM" ] || TEAM="$(team_from_cert "Apple Development" || true)"
+[ -n "$TEAM" ] || TEAM="$(team_from_cert "Developer ID Application" || true)"
 if [ -n "$TEAM" ]; then
   echo "• Ekip kimliği: $TEAM"
 else
