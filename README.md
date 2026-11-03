@@ -70,6 +70,28 @@ make app
 `NOTARY_PROFILE` profilini bir kez şu komutla kaydedersin:
 `xcrun notarytool store-credentials slipstream-notary --apple-id ... --team-id ...`
 
+## Sürüm yayınlama
+
+`v0.2.0` gibi bir etiket gönderildiğinde GitHub Actions uygulamayı Developer ID
+ile imzalar, Apple'a onaylatır (notarization) ve DMG'yi GitHub Releases'a
+yükler:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Gerekli sırları depoya yüklemek için Mac'te bir kez şunu çalıştır:
+
+```sh
+bash scripts/setup-release-secrets.sh
+```
+
+Betik anahtar zincirindeki Developer ID sertifikasını ve ekip kimliğini bulur,
+sertifikanın .p12 dosyasını ister ve sırları `gh` ile yükler. Notarization
+için fastlane'in de kullandığı App Store Connect API anahtarını
+(`~/.appstoreconnect/private_keys/AuthKey_*.p8`) kendiliğinden bulur; yoksa
+Apple kimliği ve uygulamaya özel parola sorar.
+
 ## Komut satırı
 
 Motor (`slipstreamd`) uygulamadan bağımsız da çalışır:
