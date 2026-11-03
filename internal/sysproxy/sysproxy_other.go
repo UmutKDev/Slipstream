@@ -1,10 +1,10 @@
-//go:build !darwin
+//go:build !darwin || ios
 
 package sysproxy
 
 import "errors"
 
-var errUnsupported = errors.New("sysproxy: yalnız macOS destekleniyor")
+var errUnsupported = errors.New("sysproxy: bu platformda sistem proxy'si yönetilemiyor")
 
 func Enable(string, int) error { return errUnsupported }
 func Disable() error           { return errUnsupported }

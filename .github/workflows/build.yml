@@ -35,3 +35,25 @@ jobs:
         with:
           name: Slipstream-dmg
           path: build/*.dmg
+
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: En yeni Xcode'u seç (Liquid Glass için Xcode 26)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$X" ]; then sudo xcode-select -s "$X"; fi
+          xcodebuild -version
+      - name: XcodeGen kur
+        run: brew install xcodegen
+      - name: Go çekirdeğini derle ve projeyi üret
+        run: DEVELOPMENT_TEAM="" bash scripts/build-ios.sh
+      - name: iOS uygulamasını derle (imzasız)
+        run: |
+          xcodebuild -project ios/Slipstream.xcodeproj -scheme Slipstream -configuration Debug \
+            -destination 'generic/platform=iOS' -derivedDataPath build/ios \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build

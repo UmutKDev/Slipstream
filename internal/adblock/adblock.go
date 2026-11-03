@@ -124,7 +124,7 @@ func Lookup(ids []string) []List {
 type Blocker struct {
 	enabled atomic.Bool
 	mu      sync.RWMutex
-	set     map[string]struct{}
+	set     *domainSet
 	allow   map[string]struct{}
 	updated time.Time
 
@@ -139,7 +139,7 @@ type Blocker struct {
 
 // New, boş bir engelleyici kurar.
 func New(dir string) *Blocker {
-	return &Blocker{Dir: dir, Lists: DefaultLists, set: map[string]struct{}{}, allow: map[string]struct{}{}, Client: http.DefaultClient}
+	return &Blocker{Dir: dir, Lists: DefaultLists, set: &domainSet{}, allow: map[string]struct{}{}, Client: http.DefaultClient}
 }
 
 // SetLists, kullanılacak listeleri değiştirir. Diskte olmayan liste varsa
@@ -185,7 +185,7 @@ func (b *Blocker) Enabled() bool      { return b.enabled.Load() }
 func (b *Blocker) Count() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return len(b.set)
+	return b.set.Len()
 }
 
 // Updated, listelerin son yüklenme zamanıdır.
@@ -232,7 +232,7 @@ func (b *Blocker) Block(host string) bool {
 		if _, ok := b.allow[d]; ok {
 			return false
 		}
-		if _, ok := b.set[d]; ok {
+		if b.set.Has(d) {
 			b.Blocked.Add(1)
 			return true
 		}
@@ -246,14 +246,16 @@ func (b *Blocker) Block(host string) bool {
 }
 
 // LoadCached, diskteki listeleri yükler. Hiç liste yoksa false döner.
+// Alan adları önce bir dilimde toplanır, sonra sıkıştırılmış bir kümeye
+// paketlenir; iOS tünel eklentisinin bellek sınırı için map kullanılmaz.
 func (b *Blocker) LoadCached() (bool, error) {
-	set := map[string]struct{}{}
+	var sb setBuilder
 	var newest time.Time
 	found := false
 	for _, l := range b.lists() {
 		if l.Builtin != nil {
 			for _, d := range l.Builtin {
-				set[d] = struct{}{}
+				sb.add(d)
 			}
 			continue
 		}
@@ -263,22 +265,20 @@ func (b *Blocker) LoadCached() (bool, error) {
 			continue
 		}
 		found = true
-		Parse(f, set)
+		parse(f, sb.add)
 		f.Close()
 		if st, err := os.Stat(p); err == nil && st.ModTime().After(newest) {
 			newest = st.ModTime()
 		}
 	}
-	if !found {
-		b.mu.Lock()
-		b.set = set
-		b.mu.Unlock()
-		return false, nil
-	}
+	set := sb.build()
 	b.mu.Lock()
-	b.set, b.updated = set, newest
+	b.set = set
+	if found {
+		b.updated = newest
+	}
 	b.mu.Unlock()
-	return true, nil
+	return found, nil
 }
 
 // Update, listeleri indirir, diske yazar ve yeniden yükler.
@@ -341,6 +341,10 @@ func (b *Blocker) NeedsUpdate(maxAge time.Duration) bool {
 // Parse, hosts biçimini ("0.0.0.0 alan.adi"), Adblock biçimini
 // ("||alan.adi^") ve satır başına bir alan adı biçimini okuyup kümeye ekler. Diğer kurallar yok sayılır.
 func Parse(r io.Reader, set map[string]struct{}) {
+	parse(r, func(d string) { set[d] = struct{}{} })
+}
+
+func parse(r io.Reader, add func(string)) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
 	for sc.Scan() {
@@ -372,7 +376,7 @@ func Parse(r io.Reader, set map[string]struct{}) {
 		if d == "" || d == "localhost" || d == "0.0.0.0" || strings.ContainsAny(d, "*/ |^$@#!:") {
 			continue
 		}
-		set[d] = struct{}{}
+		add(d)
 	}
 }
 

@@ -189,25 +189,85 @@ func (r *Resolver) exchange(ctx context.Context, i int, host string, t dnsmessag
 	if err != nil {
 		return nil, 0, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.providers[i].URL, bytes.NewReader(wire))
+	body, err := r.post(ctx, i, wire)
 	if err != nil {
 		return nil, 0, err
+	}
+	return ParseAnswer(body)
+}
+
+// post, DNS iletisini i. sağlayıcıya DoH ile gönderir ve ham yanıtı döndürür.
+func (r *Resolver) post(ctx context.Context, i int, wire []byte) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.providers[i].URL, bytes.NewReader(wire))
+	if err != nil {
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 	req.Header.Set("Accept", "application/dns-message")
 	resp, err := r.clients[i].Do(req)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("dns: %s HTTP %d", r.providers[i].Name, resp.StatusCode)
+		return nil, fmt.Errorf("dns: %s HTTP %d", r.providers[i].Name, resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+}
+
+// FallbackUDP, DoH sağlayıcısı yoksa ham sorguların gönderildiği adrestir.
+var FallbackUDP = "1.1.1.1:53"
+
+// Exchange, ham bir DNS sorgusunu sırayla sağlayıcılara iletir ve ham
+// yanıtı döndürür. iOS tünelinde cihazın bütün DNS sorguları buradan geçer.
+// DoH önbelleğe uygun olsun diye sorgu kimliği sıfırlanır, yanıtta geri
+// yazılır.
+func (r *Resolver) Exchange(ctx context.Context, query []byte) ([]byte, error) {
+	if len(query) < 12 {
+		return nil, errors.New("dns: sorgu çok kısa")
+	}
+	id0, id1 := query[0], query[1]
+	wire := append([]byte(nil), query...)
+	wire[0], wire[1] = 0, 0
+	var errs []error
+	for i := range r.providers {
+		resp, err := r.post(ctx, i, wire)
+		if err == nil && len(resp) >= 12 {
+			resp[0], resp[1] = id0, id1
+			return resp, nil
+		}
+		if err == nil {
+			err = errors.New("dns: yanıt çok kısa")
+		}
+		errs = append(errs, fmt.Errorf("%s: %w", r.providers[i].Name, err))
+	}
+	if r.System || len(r.providers) == 0 {
+		resp, err := exchangeUDP(ctx, query)
+		if err == nil {
+			return resp, nil
+		}
+		errs = append(errs, err)
+	}
+	return nil, errors.Join(errs...)
+}
+
+func exchangeUDP(ctx context.Context, query []byte) ([]byte, error) {
+	var d net.Dialer
+	c, err := d.DialContext(ctx, "udp", FallbackUDP)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	return ParseAnswer(body)
+	defer c.Close()
+	c.SetDeadline(time.Now().Add(4 * time.Second))
+	if _, err := c.Write(query); err != nil {
+		return nil, err
+	}
+	buf := make([]byte, 4096)
+	n, err := c.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf[:n], nil
 }
 
 // ParseAnswer, DNS yanıtındaki A/AAAA kayıtlarını ve en küçük TTL'yi döndürür.

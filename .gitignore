@@ -4,3 +4,8 @@
 /macos/.swiftpm/
 *.dmg
 .DS_Store
+# iOS: üretilen Xcode projesi ve Go çekirdeği (scripts/build-ios.sh üretir)
+ios/Frameworks/
+ios/Slipstream.xcodeproj/
+ios/*/Info.plist
+ios/*/*.entitlements

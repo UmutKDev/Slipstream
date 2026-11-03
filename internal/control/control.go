@@ -38,6 +38,10 @@ type Server struct {
 	ProxyPort int
 	Shutdown  func()
 	Ads       *adblock.Blocker
+	// ProxyHook, sistem proxy'sini networksetup yerine başka bir yolla
+	// ayarlar. iOS'ta tünel eklentisi bunu kullanarak proxy ayarını
+	// tünelin ağ ayarlarına yazar. nil ise sysproxy paketi kullanılır.
+	ProxyHook func(enabled bool, mode sysproxy.Mode) error
 
 	sysMu   sync.Mutex
 	sysGen  atomic.Uint64
@@ -306,6 +310,8 @@ func (s *Server) applySystemProxy(enabled bool, mode sysproxy.Mode) {
 	var err error
 	if enabled {
 		err = s.ApplySystemProxy(mode)
+	} else if s.ProxyHook != nil {
+		err = s.ProxyHook(false, mode)
 	} else {
 		err = sysproxy.Disable()
 	}
@@ -326,6 +332,9 @@ func (s *Server) applySystemProxy(enabled bool, mode sysproxy.Mode) {
 // sürüm parametresi eklenir; macOS PAC dosyasını önbelleğe aldığı için
 // liste değişince yeni adres verilmesi gerekir.
 func (s *Server) ApplySystemProxy(mode sysproxy.Mode) error {
+	if s.ProxyHook != nil {
+		return s.ProxyHook(true, mode)
+	}
 	pac := fmt.Sprintf("http://127.0.0.1:%d/proxy.pac?v=%d", s.ProxyPort, time.Now().Unix())
 	return sysproxy.Apply(mode, "127.0.0.1", s.ProxyPort, pac)
 }
@@ -333,7 +342,7 @@ func (s *Server) ApplySystemProxy(mode sysproxy.Mode) error {
 // RefreshPAC, PAC kipindeyse sistemin PAC dosyasını yeniden okumasını sağlar.
 func (s *Server) RefreshPAC() {
 	c := s.Store.Get()
-	if !c.SystemProxy || c.ProxyMode != string(sysproxy.ModePAC) || !sysproxy.Supported {
+	if !c.SystemProxy || c.ProxyMode != string(sysproxy.ModePAC) || (!sysproxy.Supported && s.ProxyHook == nil) {
 		return
 	}
 	s.sysMu.Lock()
