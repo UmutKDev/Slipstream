@@ -115,6 +115,16 @@ bash scripts/build-ios.sh --install   # derler ve telefona kurar
 bash scripts/build-ios.sh --open      # ya da projeyi Xcode'da aç, Çalıştır'a bas
 ```
 
+TestFlight'a yüklemek için App Store Connect'te bir kez
+`com.umutkdev.slipstream.ios` paket kimliğiyle bir uygulama kaydı aç, sonra:
+
+```sh
+bash scripts/build-ios.sh --testflight
+```
+
+Betik fastlane'in kullandığı API anahtarını (`~/.appstoreconnect/private_keys`)
+bulur, Issuer ID'yi ilk seferde sorup saklar. Derleme numarasını kendisi artırır.
+
 İlk kurulumda iPhone'da **Ayarlar > Gizlilik ve Güvenlik > Geliştirici
 Modu**'nu açman gerekir. Uygulamada ilk kez açma düğmesine dokununca iOS "VPN
 yapılandırması ekle" izni ister.

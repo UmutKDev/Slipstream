@@ -9,3 +9,5 @@ ios/Frameworks/
 ios/Slipstream.xcodeproj/
 ios/*/Info.plist
 ios/*/*.entitlements
+ios/fastlane/report.xml
+ios/fastlane/README.md
