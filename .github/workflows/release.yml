@@ -4,12 +4,19 @@ name: release
 # (notarize) DMG'yi derleyip GitHub Releases'a yükler. Actions sekmesinden
 # elle de çalıştırılabilir.
 #
+# Sırları elle girmek yerine Mac'te şunu çalıştır:
+#   bash scripts/setup-release-secrets.sh
+#
 # Gerekli depo sırları (Settings > Secrets and variables > Actions):
 #   MACOS_CERTIFICATE           Developer ID Application sertifikası (.p12), base64
 #   MACOS_CERTIFICATE_PASSWORD  .p12 dosyasının parolası
-#   APPLE_ID                    Apple geliştirici hesabının e-postası
 #   APPLE_TEAM_ID               10 karakterlik ekip kimliği
-#   APPLE_APP_PASSWORD          account.apple.com'dan alınan uygulamaya özel parola
+# Notarization için ya App Store Connect API anahtarı (fastlane'deki gibi):
+#   APPLE_API_KEY               AuthKey_XXXX.p8, base64
+#   APPLE_API_KEY_ID            anahtar kimliği
+#   APPLE_API_ISSUER            issuer kimliği
+# ya da Apple kimliği ve uygulamaya özel parola:
+#   APPLE_ID, APPLE_APP_PASSWORD
 
 on:
   push:
@@ -62,18 +69,26 @@ jobs:
         env:
           C: ${{ secrets.MACOS_CERTIFICATE }}
           P: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          A: ${{ secrets.APPLE_ID }}
           T: ${{ secrets.APPLE_TEAM_ID }}
+          K: ${{ secrets.APPLE_API_KEY }}
+          KI: ${{ secrets.APPLE_API_KEY_ID }}
+          KS: ${{ secrets.APPLE_API_ISSUER }}
+          A: ${{ secrets.APPLE_ID }}
           W: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           missing=()
           [ -n "$C" ] || missing+=(MACOS_CERTIFICATE)
           [ -n "$P" ] || missing+=(MACOS_CERTIFICATE_PASSWORD)
-          [ -n "$A" ] || missing+=(APPLE_ID)
           [ -n "$T" ] || missing+=(APPLE_TEAM_ID)
-          [ -n "$W" ] || missing+=(APPLE_APP_PASSWORD)
+          if [ -n "$K" ] && [ -n "$KI" ] && [ -n "$KS" ]; then
+            echo "Notarization: App Store Connect API anahtarı"
+          elif [ -n "$A" ] && [ -n "$W" ]; then
+            echo "Notarization: Apple kimliği ve uygulamaya özel parola"
+          else
+            missing+=("APPLE_API_KEY+APPLE_API_KEY_ID+APPLE_API_ISSUER ya da APPLE_ID+APPLE_APP_PASSWORD")
+          fi
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Eksik depo sırları: ${missing[*]}"; exit 1
+            echo "::error::Eksik depo sırları: ${missing[*]}. Mac'te 'bash scripts/setup-release-secrets.sh' çalıştır."; exit 1
           fi
 
       - name: Sertifikayı geçici anahtar zincirine yükle
@@ -99,13 +114,25 @@ jobs:
 
       - name: Notarization bilgisini kaydet
         env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
-          xcrun notarytool store-credentials slipstream-ci \
-            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" \
-            --keychain "$KEYCHAIN"
+          if [ -n "$APPLE_API_KEY" ]; then
+            KEY="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+            echo "$APPLE_API_KEY" | base64 --decode > "$KEY"
+            xcrun notarytool store-credentials slipstream-ci \
+              --key "$KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" \
+              --keychain "$KEYCHAIN"
+            rm -f "$KEY"
+          else
+            xcrun notarytool store-credentials slipstream-ci \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" \
+              --keychain "$KEYCHAIN"
+          fi
 
       - name: İmzalı ve onaylı uygulamayı derle
         env:

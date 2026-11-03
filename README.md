@@ -80,16 +80,17 @@ yükler:
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Bunun için depo ayarlarında (Settings > Secrets and variables > Actions) şu
-sırlar tanımlı olmalı:
+Gerekli sırları depoya yüklemek için Mac'te bir kez şunu çalıştır:
 
-| Sır | İçerik |
-| --- | --- |
-| `MACOS_CERTIFICATE` | Developer ID Application sertifikası (.p12), base64: `base64 -i sertifika.p12 \| pbcopy` |
-| `MACOS_CERTIFICATE_PASSWORD` | .p12 dışa aktarılırken verilen parola |
-| `APPLE_ID` | Apple geliştirici hesabının e-postası |
-| `APPLE_TEAM_ID` | 10 karakterlik ekip kimliği |
-| `APPLE_APP_PASSWORD` | account.apple.com'dan alınan uygulamaya özel parola |
+```sh
+bash scripts/setup-release-secrets.sh
+```
+
+Betik anahtar zincirindeki Developer ID sertifikasını ve ekip kimliğini bulur,
+sertifikanın .p12 dosyasını ister ve sırları `gh` ile yükler. Notarization
+için fastlane'in de kullandığı App Store Connect API anahtarını
+(`~/.appstoreconnect/private_keys/AuthKey_*.p8`) kendiliğinden bulur; yoksa
+Apple kimliği ve uygulamaya özel parola sorar.
 
 ## Komut satırı
 
