@@ -1,0 +1,6 @@
+/bin/
+/build/
+/macos/.build/
+/macos/.swiftpm/
+*.dmg
+.DS_Store
