@@ -23,6 +23,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: En yeni Xcode'u seç (Liquid Glass için Xcode 26)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$X" ]; then sudo xcode-select -s "$X"; fi
+          xcodebuild -version
+          swift --version
       - name: Uygulamayı derle (imzasız)
         run: ./scripts/build-app.sh
       - uses: actions/upload-artifact@v4

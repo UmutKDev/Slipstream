@@ -121,7 +121,9 @@ private struct PaneContainer<Content: View>: View {
 
             if scrolls {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) { content }
+                    GlassGroup(spacing: 2) {
+                        VStack(alignment: .leading, spacing: 18) { content }
+                    }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -133,6 +135,7 @@ private struct PaneContainer<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(AuroraBackground(active: engine.isRunning, intensity: 0.6).ignoresSafeArea())
     }
 }
 
@@ -146,11 +149,13 @@ private struct OffBanner: View {
                 .font(.callout)
             Spacer()
             Button("Korumayı aç", action: engine.start)
+                .glassButton(prominent: true)
+                .tint(Theme.accent)
                 .controlSize(.small)
                 .disabled(engine.state == .starting)
         }
-        .padding(10)
-        .background(Theme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(12)
+        .glassSurface(cornerRadius: 14, tint: Theme.accent.opacity(0.35))
     }
 }
 
@@ -171,27 +176,12 @@ private struct EngineBadge: View {
             }
             Spacer()
         }
-        .padding(8)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(10)
+        .glassSurface(cornerRadius: 12, tint: engine.isRunning ? Theme.ok.opacity(0.3) : nil)
     }
 }
 
 // MARK: - Ortak parçalar
-
-/// Sistem Ayarları'ndaki gibi renkli kare simge.
-struct IconTile: View {
-    let symbol: String
-    let color: Color
-    var size: CGFloat = 26
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: size * 0.5, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(color.gradient, in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous))
-    }
-}
 
 /// Başlıklı ayar kartı.
 struct SettingsCard<Content: View>: View {
@@ -208,8 +198,7 @@ struct SettingsCard<Content: View>: View {
                     .padding(.leading, 4)
             }
             VStack(spacing: 0) { content }
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.quaternary))
+                .glassSurface(cornerRadius: 18)
             if let footer {
                 Text(footer)
                     .font(.caption)
@@ -379,13 +368,13 @@ private struct ModeCard: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(selected ? Theme.accent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .glassSurface(cornerRadius: 18, tint: selected ? Theme.accent.opacity(0.35) : nil, interactive: true)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(selected ? Theme.accent : Color.secondary.opacity(0.25), lineWidth: selected ? 2 : 1)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Theme.accent.opacity(selected ? 0.9 : 0), lineWidth: 1.5)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .animation(.easeInOut(duration: 0.2), value: selected)
         }
         .buttonStyle(.plain)
     }
@@ -482,8 +471,8 @@ private struct DomainEditor: View {
             }
         }
         .frame(minHeight: minHeight)
-        .background(.background, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.quaternary))
+        .background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.10)))
     }
 }
 
@@ -515,9 +504,12 @@ struct DNSSettings: View {
 
         HStack {
             Button("DNS önbelleğini temizle", action: engine.flushDNS)
+                .glassButton()
                 .disabled(!engine.isRunning)
             Spacer()
             Button("Uygula") { engine.setDNS(selected) }
+                .glassButton(prominent: true)
+                .tint(Theme.accent)
                 .disabled(selected.isEmpty || !engine.isRunning || !changed)
                 .keyboardShortcut(.defaultAction)
         }
@@ -585,6 +577,8 @@ struct DomainSettings: View {
                     Text("\(lines(text).count) alan adı").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button("Kaydet") { engine.saveDomains(mode: mode, domains: lines(text)) }
+                        .glassButton(prominent: true)
+                        .tint(Theme.accent)
                         .disabled(!engine.isRunning)
                         .keyboardShortcut(.defaultAction)
                 }
@@ -628,6 +622,7 @@ struct LogView: View {
                 } label: {
                     Label("Kopyala", systemImage: "doc.on.doc")
                 }
+                .glassButton()
                 .disabled(entries.isEmpty)
             }
 
@@ -657,8 +652,7 @@ struct LogView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.quaternary))
+                .glassSurface(cornerRadius: 18)
                 .onChange(of: engine.logs.count) { _ in
                     if let last = entries.last { proxy.scrollTo(last.id, anchor: .bottom) }
                 }

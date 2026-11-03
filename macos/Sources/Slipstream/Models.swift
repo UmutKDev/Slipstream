@@ -151,3 +151,9 @@ struct DNSProviderInfo: Identifiable, Hashable {
         .init(id: "system", name: "Sistem DNS'i (önerilmez)"),
     ]
 }
+
+/// Menüdeki canlı trafik grafiği için tek ölçüm.
+struct RateSample: Hashable {
+    var up: Double
+    var down: Double
+}

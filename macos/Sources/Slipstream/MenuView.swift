@@ -5,27 +5,32 @@ struct MenuView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(spacing: 16) {
-            header
-            hero
-            if let err = errorText {
-                Label(err, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(Theme.warn)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
+        GlassGroup(spacing: 2) {
+            VStack(spacing: 14) {
+                header
+                hero
+                if let err = errorText {
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(Theme.warn)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(10)
+                        .glassSurface(cornerRadius: 12, tint: Theme.warn.opacity(0.4))
+                }
+                traffic
+                stats
+                adBlockRow
+                profileCard
+                probeSection
+                footer
             }
-            stats
-            adBlockRow
-            profilePicker
-            probeSection
-            Divider()
-            footer
+            .padding(16)
         }
-        .padding(16)
-        .frame(width: 320)
+        .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
-        .animation(.easeInOut(duration: 0.25), value: engine.state)
+        .background(AuroraBackground(active: isOn))
+        .animation(.easeInOut(duration: 0.35), value: engine.state)
     }
 
     // MARK: - Durum
@@ -53,7 +58,7 @@ struct MenuView: View {
             if let s = engine.status { return "\(Theme.duration(s.stats.uptimeSec)) · DNS: \(s.dns.first?.capitalized ?? "–")" }
             return "Bağlantı hazırlanıyor"
         case .starting: return "Motor ve şifreli DNS hazırlanıyor"
-        case .stopped: return "Engelli sitelere erişmek için aç"
+        case .stopped: return "Engelli sitelere erişmek için dokun"
         case .failed: return "Ayrıntı aşağıda"
         }
     }
@@ -63,10 +68,9 @@ struct MenuView: View {
     // MARK: - Bölümler
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "bolt.shield.fill")
-                .foregroundStyle(tint)
-            Text("Slipstream").font(.headline)
+        HStack(spacing: 10) {
+            IconTile(symbol: "bolt.shield.fill", color: tint, size: 26)
+            Text("Slipstream").font(.system(.headline, design: .rounded))
             Spacer()
             StatusPill(on: isOn, starting: isStarting)
         }
@@ -77,39 +81,64 @@ struct MenuView: View {
             PowerButton(on: isOn, starting: isStarting, tint: tint, action: engine.toggle)
             VStack(spacing: 3) {
                 Text(statusTitle)
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
+                    .font(.system(.title2, design: .rounded).weight(.semibold))
+                    .contentTransition(.opacity)
                 Text(statusDetail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
+        .padding(.top, 4)
+    }
+
+    private var traffic: some View {
+        let samples = engine.rateHistory
+        let now = samples.last
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Canlı trafik", systemImage: "waveform.path.ecg")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                RateLabel(symbol: "arrow.down", value: isOn ? Theme.rate(now?.down ?? 0) : "–", color: tint)
+                RateLabel(symbol: "arrow.up", value: isOn ? Theme.rate(now?.up ?? 0) : "–", color: Theme.accent2)
+            }
+            ZStack {
+                Sparkline(values: samples.map(\.up), color: Theme.accent2, minCount: EngineController.rateWindow)
+                    .opacity(0.8)
+                Sparkline(values: samples.map(\.down), color: tint, minCount: EngineController.rateWindow)
+                if !isOn {
+                    Text("Koruma açılınca trafik burada akar")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .frame(height: 44)
+        }
+        .padding(12)
+        .glassSurface(cornerRadius: 16)
     }
 
     private var stats: some View {
         let s = isOn ? engine.status?.stats : nil
-        return Grid(horizontalSpacing: 8, verticalSpacing: 8) {
-            GridRow {
-                StatTile(title: "Bağlantı", value: s.map { "\($0.total)" } ?? "–", symbol: "arrow.left.arrow.right")
-                StatTile(title: "Atlatılan", value: s.map { "\($0.bypassed)" } ?? "–", symbol: "checkmark.shield")
-            }
-            GridRow {
-                StatTile(title: "Gönderilen", value: s.map { Theme.bytes($0.bytesUp) } ?? "–", symbol: "arrow.up")
-                StatTile(title: "Alınan", value: s.map { Theme.bytes($0.bytesDown) } ?? "–", symbol: "arrow.down")
-            }
+        return HStack(spacing: 10) {
+            StatTile(title: "Bağlantı", value: s.map { "\($0.total)" } ?? "–", symbol: "arrow.left.arrow.right")
+            StatTile(title: "Atlatılan", value: s.map { "\($0.bypassed)" } ?? "–", symbol: "checkmark.shield")
+            StatTile(title: "Toplam", value: s.map { Theme.bytes($0.bytesUp + $0.bytesDown) } ?? "–", symbol: "chart.bar.fill")
         }
-        .opacity(isOn ? 1 : 0.55)
+        .opacity(isOn ? 1 : 0.6)
     }
 
     private var adBlockRow: some View {
         let info = engine.status?.adBlock
-        return HStack(spacing: 8) {
-            Image(systemName: "hand.raised.fill")
-                .foregroundStyle(info?.enabled == true && isOn ? Theme.ok : .secondary)
+        let active = info?.enabled == true && isOn
+        return HStack(spacing: 10) {
+            IconTile(symbol: "hand.raised.fill", color: active ? .red : .gray, size: 28)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Reklam engelleyici").font(.callout)
+                Text("Reklam engelleyici").font(.callout.weight(.medium))
                 Text(adBlockDetail(info)).font(.caption2).foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
             }
             Spacer()
             Toggle("", isOn: Binding(
@@ -121,8 +150,8 @@ struct MenuView: View {
             .controlSize(.small)
             .disabled(!isOn)
         }
-        .padding(10)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(12)
+        .glassSurface(cornerRadius: 16)
     }
 
     private func adBlockDetail(_ info: AdBlockInfo?) -> String {
@@ -132,75 +161,98 @@ struct MenuView: View {
         return "\(info.blocked) istek engellendi · \(info.domains.formatted()) alan adı"
     }
 
-    private var profilePicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("İnternet sağlayıcın").font(.caption).foregroundStyle(.secondary)
-            Picker("", selection: Binding(
-                get: { engine.selectedProfile },
-                set: { engine.selectProfile($0) }
-            )) {
-                ForEach(engine.profiles) { p in Text(p.name).tag(p.id) }
-                if engine.selectedProfile == "custom" {
-                    Text("Otomatik bulunan ayar").tag("custom")
+    private var profileCard: some View {
+        HStack(spacing: 10) {
+            IconTile(symbol: "antenna.radiowaves.left.and.right", color: Theme.accent, size: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("İnternet sağlayıcın").font(.caption2).foregroundStyle(.secondary)
+                Picker("", selection: Binding(
+                    get: { engine.selectedProfile },
+                    set: { engine.selectProfile($0) }
+                )) {
+                    ForEach(engine.profiles) { p in Text(p.name).tag(p.id) }
+                    if engine.selectedProfile == "custom" {
+                        Text("Otomatik bulunan ayar").tag("custom")
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                if isOn, let st = engine.status?.strategy {
+                    Text(st.summary).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-            .labelsHidden()
-            if isOn, let st = engine.status?.strategy {
-                Text(st.summary).font(.caption2).foregroundStyle(.secondary)
-            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .glassSurface(cornerRadius: 16)
     }
 
     private var probeSection: some View {
         let running = engine.probe?.running == true
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 8) {
             Button {
                 engine.startProbe()
             } label: {
                 Label(running ? "Hattın deneniyor…" : "En iyi ayarı otomatik bul", systemImage: "wand.and.stars")
+                    .font(.callout.weight(.medium))
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 3)
             }
+            .glassButton(prominent: isOn && !running)
+            .tint(Theme.accent)
             .controlSize(.large)
             .disabled(running || !isOn)
             if running {
-                ProgressView().progressViewStyle(.linear)
+                ProgressView().progressViewStyle(.linear).tint(Theme.accent)
             } else if let rep = engine.probe?.report, isOn {
                 if let best = rep.best {
-                    Text("Bulundu: \(best.ok)/\(best.total) site açıldı, ortalama \(best.latencyMs) ms")
+                    Label("Bulundu: \(best.ok)/\(best.total) site açıldı, ortalama \(best.latencyMs) ms", systemImage: "checkmark.circle.fill")
                         .font(.caption).foregroundStyle(Theme.ok)
                 } else {
-                    Text("Çalışan bir ayar bulunamadı. Agresif profili dene.")
+                    Label("Çalışan bir ayar bulunamadı. Agresif profili dene.", systemImage: "exclamationmark.circle.fill")
                         .font(.caption).foregroundStyle(Theme.warn)
                 }
-            } else if !isOn {
-                Text("Otomatik bulma için önce korumayı aç.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 8) {
             Button {
                 NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: "settings")
             } label: {
-                Label("Ayarlar", systemImage: "gearshape")
+                Label("Ayarlar", systemImage: "gearshape.fill")
+                    .frame(maxWidth: .infinity)
             }
-            Spacer()
             Button {
                 NSApp.terminate(nil)
             } label: {
-                Label("Çık", systemImage: "xmark.circle")
+                Label("Çık", systemImage: "power")
+                    .frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
+        .glassButton()
+        .controlSize(.regular)
     }
 }
 
-/// Ortadaki büyük açma/kapama düğmesi.
+private struct RateLabel: View {
+    let symbol: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: symbol).foregroundStyle(color)
+            Text(value).monospacedDigit().contentTransition(.numericText())
+        }
+        .font(.caption.weight(.semibold))
+    }
+}
+
+/// Ortadaki büyük cam açma/kapama düğmesi.
 private struct PowerButton: View {
     let on: Bool
     let starting: Bool
@@ -211,22 +263,41 @@ private struct PowerButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                Circle()
-                    .fill(on ? AnyShapeStyle(tint.gradient) : AnyShapeStyle(.quaternary.opacity(0.6)))
-                    .shadow(color: on ? tint.opacity(0.55) : .clear, radius: 16)
-                Circle()
-                    .strokeBorder(on ? Color.white.opacity(0.25) : tint.opacity(hovering ? 0.9 : 0.6), lineWidth: 3)
-                if starting {
-                    ProgressView().controlSize(.large)
-                } else {
-                    Image(systemName: "power")
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(on ? Color.white : tint)
+                // Açıkken dışa doğru yayılan halka.
+                if on {
+                    TimelineView(.animation(minimumInterval: 1 / 30)) { tl in
+                        let phase = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2.4) / 2.4
+                        Circle()
+                            .stroke(tint.opacity(0.6), lineWidth: 2)
+                            .frame(width: 106, height: 106)
+                            .scaleEffect(0.98 + 0.26 * phase)
+                            .opacity(0.9 * (1 - phase))
+                    }
                 }
+                ZStack {
+                    if on {
+                        Circle().fill(
+                            RadialGradient(colors: [tint.opacity(0.9), tint.opacity(0.55)],
+                                           center: .topLeading, startRadius: 4, endRadius: 110)
+                        )
+                    }
+                    if starting {
+                        ProgressView().controlSize(.large)
+                    } else {
+                        Image(systemName: "power")
+                            .font(.system(size: 38, weight: .semibold))
+                            .foregroundStyle(on ? Color.white : tint)
+                            .shadow(color: on ? .black.opacity(0.2) : .clear, radius: 3, y: 1)
+                    }
+                }
+                .frame(width: 104, height: 104)
+                .glassCircle(tint: on ? tint.opacity(0.35) : nil, interactive: true)
+                .shadow(color: on ? tint.opacity(0.55) : .black.opacity(0.15), radius: on ? 22 : 10)
             }
-            .frame(width: 96, height: 96)
+            .frame(width: 132, height: 132)
             .scaleEffect(hovering ? 1.04 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: hovering)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -246,11 +317,12 @@ private struct StatusPill: View {
             Circle()
                 .fill(on ? Theme.ok : (starting ? Theme.warn : Color.secondary))
                 .frame(width: 7, height: 7)
+                .shadow(color: on ? Theme.ok : .clear, radius: 3)
             Text(on ? "Açık" : (starting ? "Başlıyor" : "Kapalı"))
-                .font(.caption.weight(.medium))
+                .font(.caption.weight(.semibold))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(.quaternary.opacity(0.6), in: Capsule())
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .glassCapsule()
     }
 }

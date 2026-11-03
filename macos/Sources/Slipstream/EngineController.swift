@@ -17,6 +17,8 @@ final class EngineController: ObservableObject {
     @Published private(set) var logs: [LogEntry] = []
     @Published private(set) var probe: ProbeStatus?
     @Published var lastError: String?
+    /// Son ölçümlerdeki indirme ve yükleme hızı (bayt/sn), en eskisi başta.
+    @Published private(set) var rateHistory: [RateSample] = []
 
     @AppStorage("systemProxy") var useSystemProxy = true
     @AppStorage("proxyPort") var proxyPort = 8881
@@ -29,6 +31,8 @@ final class EngineController: ObservableObject {
     private var lastLogSeq: UInt64 = 0
     private let token = UUID().uuidString + UUID().uuidString
     private var stdoutBuffer = Data()
+    private var lastTotals: (up: Int64, down: Int64, at: Date)?
+    static let rateWindow = 40
 
     /// Önceki oturum düzgün kapanmadıysa kalan işaret dosyası.
     private var markerURL: URL {
@@ -95,6 +99,8 @@ final class EngineController: ObservableObject {
     func stop() {
         pollTask?.cancel()
         pollTask = nil
+        rateHistory = []
+        lastTotals = nil
         guard let p = process else {
             state = .stopped
             return
@@ -186,6 +192,7 @@ final class EngineController: ObservableObject {
     func refresh() async {
         guard isRunning else { return }
         if let s: EngineStatus = try? await call("GET", "/api/status") {
+            recordRate(s.stats)
             status = s
             if selectedProfile != s.profile { selectedProfile = s.profile }
         }
@@ -198,6 +205,19 @@ final class EngineController: ObservableObject {
         if probe?.running == true {
             probe = try? await call("GET", "/api/probe")
         }
+    }
+
+    private func recordRate(_ st: Stats) {
+        let now = Date()
+        defer { lastTotals = (st.bytesUp, st.bytesDown, now) }
+        guard let last = lastTotals else { return }
+        let dt = now.timeIntervalSince(last.at)
+        guard dt > 0.2 else { return }
+        // Motor yeniden başlarsa sayaçlar sıfırlanır; eksi hız gösterme.
+        let up = max(0, Double(st.bytesUp - last.up) / dt)
+        let down = max(0, Double(st.bytesDown - last.down) / dt)
+        rateHistory.append(RateSample(up: up, down: down))
+        if rateHistory.count > Self.rateWindow { rateHistory.removeFirst(rateHistory.count - Self.rateWindow) }
     }
 
     func loadProfiles() async {
