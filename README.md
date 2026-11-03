@@ -92,6 +92,43 @@ için fastlane'in de kullandığı App Store Connect API anahtarını
 (`~/.appstoreconnect/private_keys/AuthKey_*.p8`) kendiliğinden bulur; yoksa
 Apple kimliği ve uygulamaya özel parola sorar.
 
+## iPhone (iOS)
+
+`ios/` klasöründe Slipstream'in iPhone sürümü var. Aynı Go motoru gomobile ile
+bir kütüphaneye derlenir ve bir Packet Tunnel eklentisinin içinde çalışır.
+Trafik telefondan dışarıda bir sunucuya gitmez:
+
+- Tünel yalnız sahte bir DNS adresini (`198.18.0.2`) yakalar. Telefonun bütün
+  DNS sorguları buraya gelir. Reklam alan adları engellenir, gerisi şifreli
+  DNS ile çözülür. Bu yüzden reklam engelleme bütün uygulamalarda çalışır.
+- Web trafiği tünelin proxy ayarıyla eklentideki motora gelir ve engel aşma
+  burada yapılır. Proxy ayarını yok sayan uygulamalar (ör. QUIC kullanan bazı
+  oyunlar) motoru atlayabilir.
+- iOS tünel eklentisini 50 MB bellekte tutar. Reklam listeleri bu yüzden
+  sıkıştırılmış bir kümede saklanır.
+
+Telefona kurmak için iPhone'u Mac'e bağla ve şunu çalıştır:
+
+```sh
+brew install xcodegen
+bash scripts/build-ios.sh --install   # derler ve telefona kurar
+bash scripts/build-ios.sh --open      # ya da projeyi Xcode'da aç, Çalıştır'a bas
+```
+
+TestFlight'a yüklemek için App Store Connect'te bir kez
+`com.umutkdev.slipstream.ios` paket kimliğiyle bir uygulama kaydı aç, sonra:
+
+```sh
+bash scripts/build-ios.sh --testflight
+```
+
+Betik fastlane'in kullandığı API anahtarını (`~/.appstoreconnect/private_keys`)
+bulur, Issuer ID'yi ilk seferde sorup saklar. Derleme numarasını kendisi artırır.
+
+İlk kurulumda iPhone'da **Ayarlar > Gizlilik ve Güvenlik > Geliştirici
+Modu**'nu açman gerekir. Uygulamada ilk kez açma düğmesine dokununca iOS "VPN
+yapılandırması ekle" izni ister.
+
 ## Komut satırı
 
 Motor (`slipstreamd`) uygulamadan bağımsız da çalışır:
@@ -133,6 +170,7 @@ edebilir. Slipstream bir sonraki açılışta bunu fark eder ve proxy ayarını 
 
 - [x] Go motoru, DoH, profiller, otomatik bulma
 - [x] SwiftUI menü çubuğu uygulaması
+- [x] iPhone sürümü (Packet Tunnel + gomobile)
 - [ ] Network Extension: sistem proxy'sine uymayan uygulamalar (ör. Discord
       masaüstü, oyunlar) için tüm trafiği sistem düzeyinde yakalama
 - [ ] Discord sesli sohbeti için UDP desteği

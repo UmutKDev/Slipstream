@@ -1,0 +1,74 @@
+name: testflight
+
+# iOS uygulamasını derleyip TestFlight'a yükler. "ios-v1.2" gibi bir etiket
+# gönderince ya da Actions sekmesinden elle çalışır.
+#
+# Sırları Mac'te şununla yükle:
+#   bash scripts/setup-ios-secrets.sh
+#
+# Gerekli depo sırları:
+#   APPLE_API_KEY       AuthKey_XXXX.p8, base64 (App Store Connect'te Admin rolünde)
+#   APPLE_API_KEY_ID    anahtar kimliği
+#   APPLE_API_ISSUER    issuer kimliği
+#   APPLE_TEAM_ID       10 karakterlik ekip kimliği
+
+on:
+  push:
+    tags: ["ios-v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: En yeni Xcode'u seç (Liquid Glass için Xcode 26)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$X" ]; then sudo xcode-select -s "$X"; fi
+          xcodebuild -version
+
+      - name: Sırları denetle ve API anahtarını yaz
+        env:
+          K: ${{ secrets.APPLE_API_KEY }}
+          KI: ${{ secrets.APPLE_API_KEY_ID }}
+          KS: ${{ secrets.APPLE_API_ISSUER }}
+          T: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=()
+          [ -n "$K" ] || missing+=(APPLE_API_KEY)
+          [ -n "$KI" ] || missing+=(APPLE_API_KEY_ID)
+          [ -n "$KS" ] || missing+=(APPLE_API_ISSUER)
+          [ -n "$T" ] || missing+=(APPLE_TEAM_ID)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Eksik depo sırları: ${missing[*]}. Mac'te 'bash scripts/setup-ios-secrets.sh' çalıştır."; exit 1
+          fi
+          KEY="$RUNNER_TEMP/AuthKey_$KI.p8"
+          echo "$K" | base64 --decode > "$KEY"
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+
+      - name: Araçları kur
+        run: brew install xcodegen fastlane
+
+      - name: Derle ve TestFlight'a yükle
+        env:
+          ASC_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER }}
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_CLOUD_SIGNING: "1"
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+          FASTLANE_HIDE_CHANGELOG: "1"
+        run: bash scripts/build-ios.sh --testflight
+
+      - name: Anahtarı sil
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8

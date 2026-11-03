@@ -1,0 +1,89 @@
+# Slipstream iOS projesi. Xcode projesini üretmek için:
+#   brew install xcodegen
+#   bash scripts/build-ios.sh        (depo kökünden)
+# DEVELOPMENT_TEAM ortam değişkeni, betik tarafından anahtar zincirindeki
+# imza kimliğinden bulunur.
+name: Slipstream
+options:
+  bundleIdPrefix: com.umutkdev
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    # TestFlight'a ilk derleme 1.0 olarak yüklendi; sürüm geri gidemez.
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  Slipstream:
+    type: application
+    platform: iOS
+    scheme: {}
+    sources:
+      - path: Slipstream
+      - path: Shared
+      - path: ../macos/Sources/Slipstream/Models.swift
+        group: Shared
+    dependencies:
+      - target: SlipstreamTunnel
+        embed: true
+      - sdk: NetworkExtension.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.umutkdev.slipstream.ios
+        # XcodeGen'in iOS ön ayarı hedefte "1,2" (iPhone+iPad) yazıyor;
+        # yalnız iPhone olsun diye burada da verilir.
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: Slipstream
+    info:
+      path: Slipstream/Info.plist
+      properties:
+        CFBundleDisplayName: Slipstream
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.utilities
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Slipstream/Slipstream.entitlements
+      properties:
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        com.apple.security.application-groups: [group.com.umutkdev.slipstream]
+
+  SlipstreamTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SlipstreamTunnel
+      - path: Shared
+    dependencies:
+      - framework: Frameworks/Slipcore.xcframework
+        embed: false
+      - sdk: NetworkExtension.framework
+      - sdk: libresolv.tbd
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.umutkdev.slipstream.ios.tunnel
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: SlipstreamTunnel/Info.plist
+      properties:
+        CFBundleDisplayName: Slipstream Tunnel
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: SlipstreamTunnel/SlipstreamTunnel.entitlements
+      properties:
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        com.apple.security.application-groups: [group.com.umutkdev.slipstream]

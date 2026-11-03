@@ -1,0 +1,53 @@
+# Slipstream iOS'u TestFlight'a yükler. Doğrudan değil, şununla çalıştır:
+#   bash scripts/build-ios.sh --testflight
+#
+# App Store Connect API anahtarı ortam değişkenlerinden gelir:
+#   ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID, DEVELOPMENT_TEAM
+default_platform(:ios)
+
+APP_ID = "com.umutkdev.slipstream.ios"
+
+platform :ios do
+  desc "Derle, imzala ve TestFlight'a yükle"
+  lane :beta do
+    key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: ENV.fetch("ASC_KEY_PATH"),
+      in_house: false
+    )
+
+    # Her yükleme bir öncekinden büyük derleme numarası ister.
+    build = latest_testflight_build_number(api_key: key, app_identifier: APP_ID, initial_build_number: 0) + 1
+    UI.message("Derleme numarası: #{build}")
+
+    # CI'da anahtar zincirinde sertifika yok; Xcode, API anahtarıyla Apple'ın
+    # bulutta tuttuğu dağıtım sertifikasını kullanır (anahtar Admin rolünde
+    # olmalı). Mac'te Xcode'daki hesap yeter.
+    signing = "-allowProvisioningUpdates"
+    if ENV["ASC_CLOUD_SIGNING"] == "1"
+      signing += " -authenticationKeyPath #{File.expand_path(ENV.fetch("ASC_KEY_PATH"))}" \
+                 " -authenticationKeyID #{ENV.fetch("ASC_KEY_ID")}" \
+                 " -authenticationKeyIssuerID #{ENV.fetch("ASC_ISSUER_ID")}"
+    end
+
+    build_app(
+      project: "Slipstream.xcodeproj",
+      scheme: "Slipstream",
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true,
+      output_directory: "../build/ios-testflight",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build} #{signing}",
+      export_xcargs: signing,
+      export_options: { signingStyle: "automatic", teamID: ENV["DEVELOPMENT_TEAM"].to_s }
+    )
+
+    upload_to_testflight(
+      api_key: key,
+      app_identifier: APP_ID,
+      skip_waiting_for_build_processing: true
+    )
+    UI.success("Yüklendi. Apple derlemeyi 10-20 dakikada işler, sonra TestFlight uygulamasında görünür.")
+  end
+end

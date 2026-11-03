@@ -27,7 +27,11 @@ func TestParseAndBlock(t *testing.T) {
 		t.Errorf("küme %v", set)
 	}
 	b := New(t.TempDir())
-	b.set = set
+	var keys []string
+	for d := range set {
+		keys = append(keys, d)
+	}
+	b.set = newDomainSet(keys)
 	if b.Block("ads.example.com") {
 		t.Error("kapalıyken engellememeli")
 	}
@@ -64,5 +68,26 @@ func TestLookupDefaults(t *testing.T) {
 	}
 	if got := Lookup([]string{"turk-adlist", "yok"}); len(got) != 1 || got[0].ID != "turk-adlist" {
 		t.Fatalf("Lookup: %+v", got)
+	}
+}
+
+func TestDomainSet(t *testing.T) {
+	s := newDomainSet([]string{"b.com", "a.com", "c.net", "a.com", "x.y.z"})
+	if s.Len() != 4 {
+		t.Fatalf("uzunluk %d", s.Len())
+	}
+	for _, d := range []string{"a.com", "b.com", "c.net", "x.y.z"} {
+		if !s.Has(d) {
+			t.Errorf("%s bulunamadı", d)
+		}
+	}
+	for _, d := range []string{"", "a.co", "com", "zz.com"} {
+		if s.Has(d) {
+			t.Errorf("%s olmamalı", d)
+		}
+	}
+	var empty *domainSet
+	if empty.Len() != 0 || newDomainSet(nil).Has("a.com") {
+		t.Error("boş küme")
 	}
 }
