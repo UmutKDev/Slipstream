@@ -1,9 +1,12 @@
+import AppKit
 import SwiftUI
 
 enum Theme {
     static let accent = Color(red: 0.38, green: 0.42, blue: 0.98) // Slipstream mavisi
     static let ok = Color(red: 0.16, green: 0.72, blue: 0.45)
     static let warn = Color.orange
+    /// Ayar kartlarının zemini; açık ve koyu temada sistem rengine uyar.
+    static let card = Color(nsColor: .controlBackgroundColor)
 
     static func bytes(_ n: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: n, countStyle: .binary)

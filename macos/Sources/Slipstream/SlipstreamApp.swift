@@ -18,7 +18,6 @@ struct SlipstreamApp: App {
         Window("Slipstream Ayarları", id: "settings") {
             SettingsView()
                 .environmentObject(delegate.engine)
-                .frame(minWidth: 620, minHeight: 440)
         }
         .windowResizability(.contentSize)
     }
