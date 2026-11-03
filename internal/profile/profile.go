@@ -8,7 +8,7 @@ package profile
 import (
 	"sort"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/desync"
 )
 
 // Profile, kullanıcıya gösterilen tek bir hazır ayardır.

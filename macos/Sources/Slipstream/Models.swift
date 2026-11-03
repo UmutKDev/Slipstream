@@ -47,6 +47,7 @@ struct EngineStatus: Codable {
     var dns: [String]
     var mode: String
     var systemProxy: Bool
+    var proxyMode: String?
     var stats: Stats
     var autoLearn: Bool?
     var learned: Int?

@@ -1,4 +1,4 @@
-module github.com/UmutKDev/slipstream
+module github.com/UmutKDev/Slipstream
 
 go 1.26.0
 

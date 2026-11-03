@@ -41,6 +41,16 @@ struct GeneralSettings: View {
                     get: { systemProxy },
                     set: { engine.setSystemProxy($0) }
                 ))
+                Picker("Yönlendirme", selection: Binding(
+                    get: { engine.status?.proxyMode ?? "global" },
+                    set: { engine.setProxyMode($0) }
+                )) {
+                    Text("Tüm web trafiği").tag("global")
+                    Text("Yalnız engelli siteler (PAC)").tag("pac")
+                }
+                .disabled(!engine.isRunning || !systemProxy)
+                Text("PAC kipinde yalnız Alan adları listesindeki ve otomatik öğrenilen siteler Slipstream'den geçer, gerisi doğrudan gider. Daha hızlıdır ve Slipstream kapanırsa internet kesilmez. Reklam engelleyici bu kipte yalnız listedeki sitelerde çalışır.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Text("Açıkken Safari, Chrome ve sistem proxy'sine uyan tüm uygulamalar Slipstream'den geçer. Kapalıyken uygulamalara elle 127.0.0.1:\(String(proxyPort)) adresini HTTP ya da SOCKS5 proxy'si olarak girebilirsin.")
                     .font(.caption).foregroundStyle(.secondary)
                 Stepper("Proxy portu: \(String(proxyPort))", value: $proxyPort, in: 1025...65000)
@@ -157,13 +167,11 @@ struct DomainSettings: View {
                 Text("Yalnız listedeki alan adları").tag("list")
             }
             .pickerStyle(.radioGroup)
-            Text("Her satıra bir alan adı yaz. \"discord.com\" yazınca alt alan adları da kapsanır.")
+            Text("Her satıra bir alan adı yaz. \"discord.com\" yazınca alt alan adları da kapsanır. Liste PAC kipinde hangi sitelerin Slipstream'den geçeceğini de belirler.")
                 .font(.caption).foregroundStyle(.secondary)
             TextEditor(text: $text)
                 .font(.system(.body, design: .monospaced))
                 .border(.quaternary)
-                .disabled(mode == "all")
-                .opacity(mode == "all" ? 0.5 : 1)
             HStack {
                 Spacer()
                 Button("Kaydet") {

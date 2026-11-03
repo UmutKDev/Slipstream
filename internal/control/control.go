@@ -7,21 +7,22 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/UmutKDev/slipstream/internal/adblock"
-	"github.com/UmutKDev/slipstream/internal/config"
-	"github.com/UmutKDev/slipstream/internal/desync"
-	"github.com/UmutKDev/slipstream/internal/dns"
-	"github.com/UmutKDev/slipstream/internal/domains"
-	"github.com/UmutKDev/slipstream/internal/probe"
-	"github.com/UmutKDev/slipstream/internal/profile"
-	"github.com/UmutKDev/slipstream/internal/proxy"
-	"github.com/UmutKDev/slipstream/internal/sysproxy"
+	"github.com/UmutKDev/Slipstream/internal/adblock"
+	"github.com/UmutKDev/Slipstream/internal/config"
+	"github.com/UmutKDev/Slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/dns"
+	"github.com/UmutKDev/Slipstream/internal/domains"
+	"github.com/UmutKDev/Slipstream/internal/probe"
+	"github.com/UmutKDev/Slipstream/internal/profile"
+	"github.com/UmutKDev/Slipstream/internal/proxy"
+	"github.com/UmutKDev/Slipstream/internal/sysproxy"
 )
 
 // Version, motor sürümüdür.
@@ -106,6 +107,7 @@ func (s *Server) status(w http.ResponseWriter, _ *http.Request) {
 		"dns":         c.DNS,
 		"mode":        c.Mode,
 		"systemProxy": c.SystemProxy,
+		"proxyMode":   c.ProxyMode,
 		"stats":       s.Engine.Stats.Snapshot(),
 		"autoLearn":   c.AutoLearn,
 		"learned":     len(s.Engine.Learned()),
@@ -203,6 +205,9 @@ func (s *Server) setDomains(w http.ResponseWriter, r *http.Request) {
 			c.Domains = in.Domains
 		}
 	})
+	if in.Domains != nil {
+		go s.RefreshPAC()
+	}
 	s.respond(w, c, err)
 }
 
@@ -257,15 +262,26 @@ func (s *Server) getProbe(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) setSystemProxy(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Enabled bool `json:"enabled"`
+		Enabled bool   `json:"enabled"`
+		Mode    string `json:"mode"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	mode := s.Store.Get().ProxyMode
+	if in.Mode != "" {
+		if in.Mode != string(sysproxy.ModeGlobal) && in.Mode != string(sysproxy.ModePAC) {
+			http.Error(w, "kip global ya da pac olmalı", 400)
+			return
+		}
+		mode = in.Mode
+	}
 	var err error
 	if in.Enabled {
-		err = sysproxy.Enable("127.0.0.1", s.ProxyPort)
+		// Kip değişirken eski ayar kalmasın.
+		sysproxy.Disable()
+		err = s.ApplySystemProxy(sysproxy.Mode(mode))
 	} else {
 		err = sysproxy.Disable()
 	}
@@ -273,9 +289,28 @@ func (s *Server) setSystemProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	c, err := s.Store.Update(func(c *config.Config) { c.SystemProxy = in.Enabled })
-	s.Engine.Log.Infof("sistem proxy'si: %v", in.Enabled)
+	c, err := s.Store.Update(func(c *config.Config) { c.SystemProxy = in.Enabled; c.ProxyMode = mode })
+	s.Engine.Log.Infof("sistem proxy'si: %v (%s)", in.Enabled, mode)
 	s.respond(w, c, err)
+}
+
+// ApplySystemProxy, sistem proxy'sini kipe göre ayarlar. PAC adresine bir
+// sürüm parametresi eklenir; macOS PAC dosyasını önbelleğe aldığı için
+// liste değişince yeni adres verilmesi gerekir.
+func (s *Server) ApplySystemProxy(mode sysproxy.Mode) error {
+	pac := fmt.Sprintf("http://127.0.0.1:%d/proxy.pac?v=%d", s.ProxyPort, time.Now().Unix())
+	return sysproxy.Apply(mode, "127.0.0.1", s.ProxyPort, pac)
+}
+
+// RefreshPAC, PAC kipindeyse sistemin PAC dosyasını yeniden okumasını sağlar.
+func (s *Server) RefreshPAC() {
+	c := s.Store.Get()
+	if !c.SystemProxy || c.ProxyMode != string(sysproxy.ModePAC) || !sysproxy.Supported {
+		return
+	}
+	if err := s.ApplySystemProxy(sysproxy.ModePAC); err != nil {
+		s.Engine.Log.Warnf("PAC yenilenemedi: %v", err)
+	}
 }
 
 func (s *Server) shutdown(w http.ResponseWriter, _ *http.Request) {

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/desync"
 )
 
 // dpi, ilk okumada "example.com" görürse bağlantıyı kesen bir ara kutudur.

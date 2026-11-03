@@ -3,7 +3,7 @@ package proxy
 import (
 	"strings"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/desync"
 )
 
 // siteKey, öğrenilen stratejilerin hangi anahtarla saklanacağını belirler.

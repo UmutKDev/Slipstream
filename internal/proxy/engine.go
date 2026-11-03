@@ -13,11 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/UmutKDev/slipstream/internal/adblock"
-	"github.com/UmutKDev/slipstream/internal/desync"
-	"github.com/UmutKDev/slipstream/internal/dns"
-	"github.com/UmutKDev/slipstream/internal/domains"
-	"github.com/UmutKDev/slipstream/internal/logx"
+	"github.com/UmutKDev/Slipstream/internal/adblock"
+	"github.com/UmutKDev/Slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/dns"
+	"github.com/UmutKDev/Slipstream/internal/domains"
+	"github.com/UmutKDev/Slipstream/internal/logx"
 )
 
 // Engine, proxy sunucusunun durumunu tutar. Strateji ve çözücü çalışırken

@@ -20,16 +20,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/UmutKDev/slipstream/internal/adblock"
-	"github.com/UmutKDev/slipstream/internal/config"
-	"github.com/UmutKDev/slipstream/internal/control"
-	"github.com/UmutKDev/slipstream/internal/desync"
-	"github.com/UmutKDev/slipstream/internal/dns"
-	"github.com/UmutKDev/slipstream/internal/domains"
-	"github.com/UmutKDev/slipstream/internal/probe"
-	"github.com/UmutKDev/slipstream/internal/profile"
-	"github.com/UmutKDev/slipstream/internal/proxy"
-	"github.com/UmutKDev/slipstream/internal/sysproxy"
+	"github.com/UmutKDev/Slipstream/internal/adblock"
+	"github.com/UmutKDev/Slipstream/internal/config"
+	"github.com/UmutKDev/Slipstream/internal/control"
+	"github.com/UmutKDev/Slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/dns"
+	"github.com/UmutKDev/Slipstream/internal/domains"
+	"github.com/UmutKDev/Slipstream/internal/probe"
+	"github.com/UmutKDev/Slipstream/internal/profile"
+	"github.com/UmutKDev/Slipstream/internal/proxy"
+	"github.com/UmutKDev/Slipstream/internal/sysproxy"
 )
 
 const usage = `Slipstream — macOS için DPI atlatma motoru
@@ -112,9 +112,13 @@ func run(args []string) error {
 	eng.SetAutoLearn(cfg.AutoLearn)
 	dataDir := store.Dir()
 	eng.SetLearned(config.LoadLearned(dataDir))
+	var onLearned func()
 	eng.OnLearn = func(m map[string]desync.Strategy) {
 		if err := config.SaveLearned(dataDir, m); err != nil {
 			eng.Log.Warnf("öğrenilen ayarlar yazılamadı: %v", err)
+		}
+		if onLearned != nil {
+			onLearned()
 		}
 	}
 
@@ -151,6 +155,9 @@ func run(args []string) error {
 
 	ctl := &control.Server{Engine: eng, Store: store, Token: *token, ProxyPort: port, Shutdown: stop, Ads: ads}
 	go ctl.RunAdUpdates(ctx)
+	// PAC kipinde yeni öğrenilen site PAC dosyasına girer; sistemin
+	// dosyayı yeniden okuması için adres yenilenir.
+	onLearned = func() { go ctl.RefreshPAC() }
 	apiLn, err := net.Listen("tcp", *api)
 	if err != nil {
 		return fmt.Errorf("kontrol API portu açılamadı: %w", err)
@@ -160,8 +167,14 @@ func run(args []string) error {
 
 	useSys := *sys || cfg.SystemProxy
 	if useSys && sysproxy.Supported {
-		if err := sysproxy.Enable("127.0.0.1", port); err != nil {
+		if *sys && !cfg.SystemProxy {
+			store.Update(func(c *config.Config) { c.SystemProxy = true })
+		}
+		mode := sysproxy.Mode(cfg.ProxyMode)
+		if err := ctl.ApplySystemProxy(mode); err != nil {
 			eng.Log.Errorf("sistem proxy'si ayarlanamadı: %v", err)
+		} else if mode == sysproxy.ModePAC {
+			eng.Log.Infof("sistem proxy'si PAC kipinde: yalnız listedeki siteler 127.0.0.1:%d üzerinden geçer", port)
 		} else {
 			eng.Log.Infof("sistem proxy'si 127.0.0.1:%d olarak ayarlandı", port)
 		}

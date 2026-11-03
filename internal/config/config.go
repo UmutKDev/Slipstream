@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
-	"github.com/UmutKDev/slipstream/internal/domains"
-	"github.com/UmutKDev/slipstream/internal/profile"
+	"github.com/UmutKDev/Slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/domains"
+	"github.com/UmutKDev/Slipstream/internal/profile"
 )
 
 // Config, kalıcı ayarlardır.
@@ -23,6 +23,7 @@ type Config struct {
 	Domains     []string         `json:"domains"`
 	Listen      string           `json:"listen"`
 	SystemProxy bool             `json:"systemProxy"`
+	ProxyMode   string           `json:"proxyMode"` // "global" ya da "pac"
 	AutoLearn   bool             `json:"autoLearn"` // çalışmayan sitede sıradaki stratejiyi dene ve hatırla
 	AdBlock     bool             `json:"adBlock"`   // reklam ve izleyici engelleyici
 	AdAllow     []string         `json:"adAllow"`   // reklam engelleyicinin dokunmayacağı alan adları
@@ -37,6 +38,7 @@ func Default() Config {
 		Mode:      domains.ModeAll,
 		Domains:   append([]string(nil), domains.DefaultBlocked...),
 		Listen:    "127.0.0.1:8881",
+		ProxyMode: "global",
 		AutoLearn: true,
 		AdBlock:   true,
 	}

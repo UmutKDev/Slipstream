@@ -59,18 +59,41 @@ func Enable(host string, port int) error {
 	return nil
 }
 
-// Disable, HTTP ve HTTPS proxy'lerini kapatır.
+// EnablePAC, tüm etkin hizmetlerde otomatik proxy yapılandırmasını (PAC)
+// verilen adrese ayarlar ve elle proxy ayarlarını kapatır. PAC dosyası
+// yalnız listedeki siteleri proxy'ye yollar; motor kapalıysa tarayıcı
+// doğrudan bağlanır, böylece internet kesilmez.
+func EnablePAC(url string) error {
+	svcs, err := Services()
+	if err != nil {
+		return err
+	}
+	for _, s := range svcs {
+		for _, cmd := range [][]string{
+			{"-setwebproxystate", s, "off"},
+			{"-setsecurewebproxystate", s, "off"},
+			{"-setautoproxyurl", s, url},
+			{"-setautoproxystate", s, "on"},
+		} {
+			if err := run(cmd...); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Disable, HTTP, HTTPS ve otomatik (PAC) proxy ayarlarını kapatır.
 func Disable() error {
 	svcs, err := Services()
 	if err != nil {
 		return err
 	}
 	for _, s := range svcs {
-		if err := run("-setwebproxystate", s, "off"); err != nil {
-			return err
-		}
-		if err := run("-setsecurewebproxystate", s, "off"); err != nil {
-			return err
+		for _, kind := range []string{"-setwebproxystate", "-setsecurewebproxystate", "-setautoproxystate"} {
+			if err := run(kind, s, "off"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

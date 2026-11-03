@@ -16,9 +16,9 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
-	"github.com/UmutKDev/slipstream/internal/dns"
-	"github.com/UmutKDev/slipstream/internal/domains"
+	"github.com/UmutKDev/Slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/dns"
+	"github.com/UmutKDev/Slipstream/internal/domains"
 )
 
 // fakeDPI, Türkiye'deki SNI filtrelerini taklit eden bir ara kutudur.
@@ -231,5 +231,26 @@ func TestAutoLearnRetriesAndRemembers(t *testing.T) {
 	}
 	if code, err := httpsVia(ln.Addr().String(), "https://"+banned+":"+port+"/"); err != nil || code != 200 {
 		t.Fatalf("ikinci istek: code=%d err=%v", code, err)
+	}
+}
+
+func TestPACServed(t *testing.T) {
+	r, _ := dns.New("cloudflare")
+	e := NewEngine(desync.Strategy{Name: "x"}, r, domains.NewMatcher(domains.ModeAll, []string{"discord.com"}))
+	e.SetLearned(map[string]desync.Strategy{"wattpad.com": {Name: "sni"}})
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go e.Serve(ctx, ln)
+	resp, err := http.Get("http://" + ln.Addr().String() + "/proxy.pac")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	s := string(body)
+	if resp.Header.Get("Content-Type") != "application/x-ns-proxy-autoconfig" ||
+		!strings.Contains(s, `"discord.com"`) || !strings.Contains(s, `"wattpad.com"`) ||
+		!strings.Contains(s, "PROXY "+ln.Addr().String()) || !strings.Contains(s, "FindProxyForURL") {
+		t.Fatalf("PAC beklenen gibi değil:\n%s", s)
 	}
 }

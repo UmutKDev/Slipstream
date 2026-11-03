@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/desync"
 )
 
 // DefaultTargets, Türkiye'de engelli olduğu bilinen ve deneme için

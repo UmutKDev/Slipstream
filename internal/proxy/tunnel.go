@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/UmutKDev/slipstream/internal/desync"
-	"github.com/UmutKDev/slipstream/internal/tlsx"
+	"github.com/UmutKDev/Slipstream/internal/desync"
+	"github.com/UmutKDev/Slipstream/internal/tlsx"
 )
 
 // httpMethods, düz HTTP isteğini tanımak için kullanılan başlangıçlardır.

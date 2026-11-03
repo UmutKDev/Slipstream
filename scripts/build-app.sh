@@ -18,7 +18,7 @@ APP="$OUT/Slipstream.app"
 rm -rf "$OUT" && mkdir -p "$OUT"
 
 echo "› Motor derleniyor (arm64 + x86_64)"
-LDFLAGS="-s -w -X github.com/UmutKDev/slipstream/internal/control.Version=$VERSION"
+LDFLAGS="-s -w -X github.com/UmutKDev/Slipstream/internal/control.Version=$VERSION"
 for arch in arm64 amd64; do
   (cd "$ROOT" && CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath -ldflags "$LDFLAGS" -o "$OUT/slipstreamd-$arch" ./cmd/slipstreamd)
 done

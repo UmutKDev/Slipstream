@@ -229,6 +229,17 @@ final class EngineController: ObservableObject {
         Task { let _: Empty? = try? await call("POST", "/api/dns/flush") }
     }
 
+    func setProxyMode(_ mode: String) {
+        struct Body: Encodable { let enabled: Bool; let mode: String }
+        guard isRunning else { return }
+        Task {
+            do {
+                let _: Empty = try await call("POST", "/api/systemproxy", body: Body(enabled: useSystemProxy, mode: mode))
+                await refresh()
+            } catch { lastError = error.localizedDescription }
+        }
+    }
+
     func setSystemProxy(_ on: Bool) {
         useSystemProxy = on
         guard isRunning else { return }

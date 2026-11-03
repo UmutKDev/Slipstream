@@ -20,6 +20,12 @@ func (e *Engine) serveHTTP(c net.Conn, br *bufio.Reader) {
 	if err != nil {
 		return
 	}
+	// Proxy'ye doğrudan gelen (mutlak adres içermeyen) istek: PAC dosyası.
+	if req.Method == http.MethodGet && req.URL.Host == "" && req.URL.Path == "/proxy.pac" {
+		body := e.PAC(c.LocalAddr().String())
+		fmt.Fprintf(c, "HTTP/1.1 200 OK\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nCache-Control: no-cache\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(body), body)
+		return
+	}
 	if req.Method == http.MethodConnect {
 		host, port := splitHostPort(req.Host, 443)
 		up, err := e.Dial(context.Background(), host, port)
