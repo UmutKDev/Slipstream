@@ -70,6 +70,27 @@ make app
 `NOTARY_PROFILE` profilini bir kez şu komutla kaydedersin:
 `xcrun notarytool store-credentials slipstream-notary --apple-id ... --team-id ...`
 
+## Sürüm yayınlama
+
+`v0.2.0` gibi bir etiket gönderildiğinde GitHub Actions uygulamayı Developer ID
+ile imzalar, Apple'a onaylatır (notarization) ve DMG'yi GitHub Releases'a
+yükler:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Bunun için depo ayarlarında (Settings > Secrets and variables > Actions) şu
+sırlar tanımlı olmalı:
+
+| Sır | İçerik |
+| --- | --- |
+| `MACOS_CERTIFICATE` | Developer ID Application sertifikası (.p12), base64: `base64 -i sertifika.p12 \| pbcopy` |
+| `MACOS_CERTIFICATE_PASSWORD` | .p12 dışa aktarılırken verilen parola |
+| `APPLE_ID` | Apple geliştirici hesabının e-postası |
+| `APPLE_TEAM_ID` | 10 karakterlik ekip kimliği |
+| `APPLE_APP_PASSWORD` | account.apple.com'dan alınan uygulamaya özel parola |
+
 ## Komut satırı
 
 Motor (`slipstreamd`) uygulamadan bağımsız da çalışır:
