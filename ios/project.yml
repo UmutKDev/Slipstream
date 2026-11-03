@@ -35,6 +35,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.umutkdev.slipstream.ios
+        # XcodeGen'in iOS ön ayarı hedefte "1,2" (iPhone+iPad) yazıyor;
+        # yalnız iPhone olsun diye burada da verilir.
+        TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: Slipstream
     info:
@@ -44,6 +47,7 @@ targets:
         LSApplicationCategoryType: public.app-category.utilities
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
         ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: Slipstream/Slipstream.entitlements
@@ -65,6 +69,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.umutkdev.slipstream.ios.tunnel
+        TARGETED_DEVICE_FAMILY: "1"
     info:
       path: SlipstreamTunnel/Info.plist
       properties:
